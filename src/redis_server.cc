@@ -1,22 +1,28 @@
 #include "mini-redis.h"
 
-static void handle_client(int fd) { // placeholder code
-    char rbuf[64] = {};
-    ssize_t n = ::read(fd, rbuf, sizeof(rbuf) - 1);
-    if (n < 0) {
-        std::fprintf(stderr, "read() error");
-        return ;
-    }
-    std::printf("client says: %s\n", rbuf);
+int set_non_blocking(int fd) {
+    int flags = ::fcntl(fd, F_GETFL, 0);
+    if (flags == -1) return -1;
+    return (::fcntl(fd, F_FETFL, flags | O_NONBLOCK));
+}
+
+static Conn *handle_accept(int fd) { 
+    struct sockaddr_in client_addr = {};
+    socklen_t addrlen = sizeof(client_addr);
+    int connfd = accept(fd, reinterpret_cast<sockaddr *>(&client_addr), &addrlen);
+    if (connfd < 0) return nullptr;
+    if (set_non_blocking(connfd)) (void)0; // handle error
+    Conn *conn = new Conn();
+    conn->fd = connfd;
+    conn->want_read = true;
+    return conn;
 }
 
 static int socket_listen(const char *host, uint16_t port) {
     int fd = ::socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) return -1;
 
-    int flags = ::fcntl(fd, F_GETFL, 0);
-    if (flags == -1) (void)0; // TODO:handle error
-    if (::fcntl(fd, F_FETFL, flags | O_NONBLOCK) == -1) (void)0; // TODO: handle error
+    if (set_non_blocking(fd) < 0) (void)0; // TODO: handle error
 
     int val = 1;
     if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val)) < 0)
@@ -70,7 +76,7 @@ int run_server(const char* host, uint16_t port) {
         for (int fd = 0; fd < (int)pfds.size(); ++fd) {
             Conn *c = fd2conn[fd];
             if (!c) continue;
-            struct pollfd pfd = {conn->fd, POLLERR, 0};
+            struct pollfd pfd = {c->fd, POLLERR, 0};
             if (c->want_read) pfd.events |= POLLIN;
             if (c->want_write) pfd.events |= POLLOUT;
             pfds.push_back(pfd);
@@ -83,18 +89,23 @@ int run_server(const char* host, uint16_t port) {
         }
 
         if (pfds[0].revents & POLLIN) { // revents in the server_fd aka new connections
-            if (Conn *conn = handle_accept(server_fd)) {
-                if (fd2conn.size() <= (size_t)conn->fd) fd2conn.resize(conn->fd + 1);
-                fd2conn[conn->fd] = conn;
+            if (Conn *c = handle_accept(server_fd)) {
+                if (fd2conn.size() <= (size_t)c->fd) fd2conn.resize(c->fd + 1);
+                fd2conn[c->fd] = conn;
             }
         }
 
         for (size_t i = 1; i < pfds.size(); ++i) {
             uint32_t re = pfds[i].revents;
-            Conn *conn = fd2conn[pfds[i].fd];
-            if (re & POLLIN) handle_read(conn);
-            if (re & POLLOUT) handle_write(conn);
-            if (re & POLLERR || conn->want_close) handle_destroy(conn);
+            Conn *c = fd2conn[pfds[i].fd];
+            if (re & POLLIN) handle_read(c);
+            if (re & POLLOUT) handle_write(c);
+            if (re & POLLERR || c->want_close) {
+                int fd = c->fd;
+                handle_destroy(c)
+                if (fd >= 0 && static_cast<size_t>(fd) < fd2conn.size())
+                    fd2conn[fd] = nullptr;
+            }
         }
     } 
 

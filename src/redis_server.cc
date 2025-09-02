@@ -14,6 +14,10 @@ static int socket_listen(const char *host, uint16_t port) {
     int fd = ::socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) return -1;
 
+    int flags = ::fcntl(fd, F_GETFL, 0);
+    if (flags == -1) (void)0; // TODO:handle error
+    if (::fcntl(fd, F_FETFL, flags | O_NONBLOCK) == -1) (void)0; // TODO: handle error
+
     int val = 1;
     if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val)) < 0)
         (void)0; // TODO: handle error
@@ -72,14 +76,14 @@ int run_server(const char* host, uint16_t port) {
             pfds.push_back(pfd);
         }
         
-        int rv = poll(pfds.data(), (nfds_t)pfds.size(), -1);
+        int rv = ::poll(pfds.data(), (nfds_t)pfds.size(), -1);
         if (rv < 0) {
             if (errno == EINTR) continue;
             // manage fatal error 
         }
 
-        if (pfds[0].revents) { // revents in the server_fd aka new connections
-            if (Conn *conn = handle_accept(fd)) {
+        if (pfds[0].revents & POLLIN) { // revents in the server_fd aka new connections
+            if (Conn *conn = handle_accept(server_fd)) {
                 if (fd2conn.size() <= (size_t)conn->fd) fd2conn.resize(conn->fd + 1);
                 fd2conn[conn->fd] = conn;
             }

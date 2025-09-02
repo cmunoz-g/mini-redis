@@ -1,11 +1,4 @@
-#include <cstdint>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <cstring>
-#include <arpa/inet.h>
-#include <cerrno>
-#include <cstdio>
+#include "mini-redis.h"
 
 static void handle_client(int fd) { // placeholder code
     char rbuf[64] = {};
@@ -63,14 +56,47 @@ int run_server(const char* host, uint16_t port) {
     int server_fd = socket_listen(host, port);
     if (server_fd < 0) return 1; // think through error mgmt
 
+    std::vector<Conn *> fd2conn;
+    std::vector<struct pollfd> pfds;
+    
     for (;;) {
-        struct sockaddr_in addr = {};
-        socklen_t len = sizeof(addr);
-        int connfd = ::accept(server_fd, reinterpret_cast<sockaddr*>(&addr), &len);
-        if (connfd < 0) continue;
-        handle_client(connfd);
-        ::close(connfd);
-    }
+        pfds.clear();
+        pfds.push_back(pollfd{server_fd, POLLIN, 0});
+
+        for (int fd = 0; fd < (int)pfds.size(); ++fd) {
+            Conn *c = fd2conn[fd];
+            if (!c) continue;
+            struct pollfd pfd = {conn->fd, POLLERR, 0};
+            if (c->want_read) pfd.events |= POLLIN;
+            if (c->want_write) pfd.events |= POLLOUT;
+            pfds.push_back(pfd);
+        }
+        
+        int rv = poll(pfds.data(), (nfds_t)pfds.size(), -1);
+        if (rv < 0) {
+            if (errno == EINTR) continue;
+            // manage fatal error 
+        }
+
+        if (pfds[0].revents) { // revents in the server_fd aka new connections
+            if (Conn *conn = handle_accept(fd)) {
+                if (fd2conn.size() <= (size_t)conn->fd) fd2conn.resize(conn->fd + 1);
+                fd2conn[conn->fd] = conn;
+            }
+        }
+
+        for (size_t i = 1; i < pfds.size(); ++i) {
+            uint32_t re = pfds[i].revents;
+            Conn *conn = fd2conn[pfds[i].fd];
+            if (re & POLLIN) handle_read(conn);
+            if (re & POLLOUT) handle_write(conn);
+            if (re & POLLERR || conn->want_close) handle_destroy(conn);
+        }
+    } 
 
     return (0);
+}
+
+int main(void) {
+    return run_server("0.0.0.0", 1234);
 }

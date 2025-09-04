@@ -1,20 +1,119 @@
 #include "mini-redis.h"
 
+#define BUFFER_SIZE_KB 64
+#define BYTES_IN_KB 1024
+#define MSG_SIZE_LIMIT 4096
+
 int set_non_blocking(int fd) {
     int flags = ::fcntl(fd, F_GETFL, 0);
     if (flags == -1) return -1;
     return (::fcntl(fd, F_FETFL, flags | O_NONBLOCK));
 }
 
+static void buf_append(Buffer &buf, const uint8_t *data, size_t len) {
+    if (len == 0) return;
+    assert(b.buffer_begin <= b.data_begin && b.data_begin <= b.data_end && b.data_end <= b.buffer_end);
+
+    size_t used = static_cast<size_t>(buf.data_end - buf.data_begin);
+    size_t free = static_cast<size_t>(buf.buffer_end - buf.data_end);
+
+    if (free < len) {
+        std::memmove(buf.buffer_begin, buf.data_begin, used);
+        buf.data_begin = buf.buffer_begin;
+        buf.data_end = buf.data_begin + used;
+        free = static_cast<size_t>(buf.buffer_end - buf.data_end);
+    }
+
+    if (free < len) void(0); // meaning, still no room left to append. buf_append()
+    // could return a bool and the situation be managed in the caller ft.
+    std::memcpy(buf.data_end, data, len);
+    buf.data_end += len;
+}
+
+static void buf_consume(Buffer &buf, size_t n) {
+    size_t used = static_cast<size_t>(buf.data_end - buf.data_begin);
+    assert(n <= used);
+
+    buf->data_begin += n;
+    
+    if (buf->data_begin == buf->data_end) {
+        buf->data_begin = buf->buffer_begin;
+        buf->data_end = buf->buffer_begin;
+    }
+}
+
+static bool handle_request(Conn *conn) {
+    size_t size = conn->in.data_end - conn->in.data_begin;
+    if (size < 4) return false;
+
+    uint32_t len = 0;
+    memcpy(&len, conn->in.data_begin, 4);
+    if (len > MSG_SIZE_LIMIT) {
+        conn->want_close = true;
+        return false;
+    }
+
+    if (4 + len > size) return false;
+
+    const uint8_t *request = conn->in.data_begin + 4;
+    buf_append(conn->out, static_cast<const uint8_t *>(&len), 4);
+    buf_append(conn->out, request, len);
+
+    buf_consume(conn->in, 4 + len);
+    return true;
+}
+
+static void handle_write(Conn *conn) {
+    size_t size = conn->out.data_end - conn->out.data_begin;
+
+    assert(size > 0);
+    ssize_t rv = write(conn->fd, conn->out.data_begin, size);
+    if (rv < 0) {
+        if (errno == EAGAIN) return;
+        conn->want_close = true;
+        return;
+    }
+
+    buf_consume(conn->out, reinterpret_cast<size_t>(rv));
+    if (conn->out.data_begin == conn->out.data_end) {
+        conn->want_read = true;
+        conn->want_write = false;
+    }
+}
+
+static void handle_read(Conn *conn) {
+    uint8_t buf[BUFFER_SIZE_KB * BYTES_IN_KB];
+    ssize_t rv = ::read(conn->fd, buf, sizeof(buf));
+    if (rv <= 0) {
+        conn->want_close = true;
+        return;
+    }
+    buf_append(conn->in, buf, reinterpret_cast<size_t>(rv));
+    while (handle_request(conn)) {};
+    if (conn->out.data_begin != conn->out.data_end) {
+        conn->want_read = false;
+        conn->want_write = true;
+        return handle_write(conn);
+    }
+}
+
 static Conn *handle_accept(int fd) { 
     struct sockaddr_in client_addr = {};
     socklen_t addrlen = sizeof(client_addr);
-    int connfd = accept(fd, reinterpret_cast<sockaddr *>(&client_addr), &addrlen);
+    int connfd = ::accept(fd, reinterpret_cast<sockaddr *>(&client_addr), &addrlen);
     if (connfd < 0) return nullptr;
     if (set_non_blocking(connfd)) (void)0; // handle error
     Conn *conn = new Conn();
     conn->fd = connfd;
     conn->want_read = true;
+
+    constexpr size_t buffer_size = BUFFER_SIZE_KB * BYTES_IN_KB; // consider: should this be a macro?
+    uint8_t *inbuf = new uint8_t[buffer_size];
+    uint8_t *outbuf = new uint8_t[buffer_size];
+
+    conn->in = {inbuf, inbuf + buffer_size, inbuf, inbuf};
+    conn->out = {outbuf, outbuf + buffer_size, outbuf, outbuf};
+
     return conn;
 }
 
@@ -85,7 +184,7 @@ int run_server(const char* host, uint16_t port) {
         int rv = ::poll(pfds.data(), (nfds_t)pfds.size(), -1);
         if (rv < 0) {
             if (errno == EINTR) continue;
-            // manage fatal error 
+            //else manage fatal error 
         }
 
         if (pfds[0].revents & POLLIN) { // revents in the server_fd aka new connections

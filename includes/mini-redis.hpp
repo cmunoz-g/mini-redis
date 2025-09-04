@@ -10,8 +10,15 @@
 #include <cstdio>
 #include <vector>
 
+struct Buffer {
+    uint8_t *buffer_begin;
+    uint8_t *buffer_end;
+    uint8_t *data_begin;
+    uint8_t *data_end;
+};
+
 struct Conn {
     int fd{-1};
     bool want_read{true}, want_write{false}, want_close{false};
-    std::vector<uint8_t> incoming, outgoing;
+    Buffer in, out;
 };

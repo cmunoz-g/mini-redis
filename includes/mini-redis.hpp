@@ -22,3 +22,8 @@ struct Conn {
     bool want_read{true}, want_write{false}, want_close{false};
     Buffer in, out;
 };
+
+struct Response {
+    uint32_t status = 0;
+    std::vector<uint8_t> data;
+};

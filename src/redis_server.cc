@@ -3,6 +3,7 @@
 #define BUFFER_SIZE_KB 64
 #define BYTES_IN_KB 1024
 #define MSG_SIZE_LIMIT 4096
+constexpr size_t K_MAX_ARGS = 32u << 20;
 
 int set_non_blocking(int fd) {
     int flags = ::fcntl(fd, F_GETFL, 0);
@@ -42,6 +43,75 @@ static void buf_consume(Buffer &buf, size_t n) {
     }
 }
 
+static bool read_u32(const uint8_t *&cur, const uint8_t *end, uint32_t &out) {
+    if (cur + 4 > end) return false;
+    memcpy(&out, cur, 4);
+    cur += 4;
+    return true;
+}
+
+static bool read_str(const uint8_t *&cur, const uint8_t *end, const size_t n, string &out) {
+    if (cur + n > end) return false;
+    out.assign(cur, cur + n);
+    cur += n;
+    return true;
+}
+
+//Response::status
+enum {
+    RES_OK = 0;
+    RES_ERR = 1;
+    RES_KEY_NOT_FOUND = 2; 
+}
+
+static void do_request(std::vector<std::string> &cmd, Response &resp) { // could I copy directly to conn->out instead of passing though Response
+    std::map<std::string, std::string> data; //placeholder
+    if (cmd.size() == 2 && cmd[0] == "get") {
+        auto it = g_data.find(cmd[1]);
+        if (it == g_data.end()) {
+            resp.status = RES_KEY_NOT_FOUND;
+            return;
+        }
+        const std::string &val = it->second;
+        resp.data.assign(val.begin(), val.end());    
+    }
+    else if (cmd.size() == 3 && cmd[0] == "set") {
+        data[cmd[1]].swap(cmd[2]);
+    }
+    else if (cmd.size() == 2 && cmd[0] == "del") {
+        data.erase(cmd[1]);
+    }
+    else {
+        resp.status = RES_ERR;
+    }
+
+}
+
+static void do_response(const Response &resp, Buffer &out) {
+    uint32_t resp_len = 4 + static_cast<uint32_t>(resp.data.size());
+    buf_append(out, reinterpret_cast<const uint8_t *>(&resp_len), sizeof(resp_len));
+    buf_append(out, reinterpret_cast<const uint8_t *>(&resp.status), sizeof(uint32_t));
+    buf_append(out, resp.data.data(), resp.data.size());
+}
+
+static int32_t parse_request(const uint8_t *data, const size_t size, vector<std::string> &out) {
+    const uint8_t *end = data + size;
+    uint32_t nstr = 0;
+
+    if (!read_u32(data, end, nstr)) return -1;
+    if (nstr > K_MAX_ARGS) return -1;
+
+    while (out.size() < nstr) {
+        uint32_t len = 0;
+        if (!read_u32(data, end, len)) return -1;
+        std::string s;
+        if (!read_str(data, end, len, s)) return -1;
+        out.push_back(s);
+    }
+    if (data != end) return -1;
+    return 0;
+}
+
 static bool handle_request(Conn *conn) {
     size_t size = conn->in.data_end - conn->in.data_begin;
     if (size < 4) return false;
@@ -56,10 +126,17 @@ static bool handle_request(Conn *conn) {
     if (4 + len > size) return false;
 
     const uint8_t *request = conn->in.data_begin + 4;
-    buf_append(conn->out, static_cast<const uint8_t *>(&len), 4);
-    buf_append(conn->out, request, len);
+    
+    std::vector<std::string> cmd;
+    if (parse_request(request, len, cmd) > 0) {
+        conn->want_close = true;
+        return false;
+    }
 
-    buf_consume(conn->in, 4 + len);
+    Response resp;
+    do_request(cmd, resp);
+    do_response(resp, conn->out);
+
     return true;
 }
 

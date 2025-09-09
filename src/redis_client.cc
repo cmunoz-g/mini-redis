@@ -1,4 +1,3 @@
-#include "mini-redis.h"
 
 int redis_client(uint16_t port) { // test function ?
     int fd = socket(AF_INET, SOCK_STREAM, 0);

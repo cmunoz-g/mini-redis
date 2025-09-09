@@ -1,0 +1,101 @@
+#include "hashtable.hh"
+#include <limits>
+#include <assert.h>
+#include <cstdlib>
+
+static constexpr size_t MAX_LOAD_FACTOR = 8;
+static constexpr size_t INITIAL_TABLE_SIZE = 4;
+static constexpr size_t REHASHING_WORK = 128;
+
+/* Tab functions */
+static void h_init(HTab *htab, size_t n) {
+    assert(n > 0 && ((n - 1) & n) == 0);
+    htab->tab = reinterpret_cast<HNode **>(std::calloc(n, sizeof(HNode *)));
+    htab->mask = n - 1;
+    htab->size = 0;
+    htab->threshold = (htab->mask + 1) * MAX_LOAD_FACTOR;
+}
+
+static void h_insert(HTab *htab, HNode *node) {
+    size_t pos = node->hcode & htab->mask;
+    HNode *next = htab->tab[pos];
+    node->next = next;
+    htab->tab[pos] = node;
+    htab->size++;
+}
+
+static HNode **h_lookup(HTab *htab, HNode *key, bool (*eq)(HNode *, HNode *)) {
+    if (!htab->tab) return nullptr;
+
+    size_t pos = key->hcode & htab->mask;
+    HNode **from = &htab->tab[pos];
+    for (HNode *cur; (cur = *from) != nullptr; from = &cur->next) {
+        if (cur->hcode == key->hcode && eq(cur, key)) return from;
+    }
+    return nullptr;
+}
+
+static HNode *h_detach(HTab *htab, HNode **from) {
+    HNode *node = *from;
+    *from = node->next;
+    htab->size--;
+    return node;
+}
+
+/* HMap rehashing functions */
+static void hm_help_rehashing(HMap *hmap) {
+    size_t nwork = 0;
+    while (nwork < REHASHING_WORK && hmap->older.size > 0 && hmap->migrate_pos <= hmap->older.mask) {
+        HNode **from = &hmap->older.tab[hmap->migrate_pos];
+        if (!*from) {
+            hmap->migrate_pos++;
+            continue;
+        }
+        HNode *moved = h_detach(&hmap->older, from);
+        h_insert(&hmap->newer, moved);
+        nwork++;
+    }
+
+    if (hmap->older.tab && hmap->older.size == 0) {
+        std::free(hmap->older.tab);
+        hmap->older = HTab{};
+    }
+}
+
+static void hm_trigger_rehashing(HMap *hmap) {
+    assert(hmap->older.tab == nullptr);
+
+    const size_t curr_mask = hmap->newer.mask + 1;
+    if (curr_mask > (std::numeric_limits<size_t>::max() >> 1)) return;
+    hmap->older = hmap->newer; 
+    h_init(&hmap->newer, curr_mask * 2);
+    hmap->migrate_pos = 0;
+}
+
+/* API */
+
+HNode *hm_lookup(HMap *hmap, HNode *key, bool (*eq)(HNode *, HNode *)) {
+    hm_help_rehashing(hmap);
+    HNode **from = h_lookup(&hmap->newer, key, eq);
+    if (!from)
+    from = h_lookup(&hmap->older, key, eq);
+    return from ? *from : nullptr;
+}
+
+HNode *hm_delete(HMap *hmap, HNode *key, bool (*eq)(HNode *, HNode *)) {
+    hm_help_rehashing(hmap);
+    if (HNode **from = h_lookup(&hmap->newer, key, eq))
+        return h_detach(&hmap->newer, from);
+    if (HNode **from = h_lookup(&hmap->older, key, eq))
+        return h_detach(&hmap->older, from);
+    return nullptr;
+}
+
+void hm_insert(HMap *hmap, HNode *node) {
+    if (!hmap->newer.tab)
+        h_init(&hmap->newer, INITIAL_TABLE_SIZE);
+    h_insert(&hmap->newer, node);
+    if (!hmap->older.tab && hmap->newer.size >= hmap->newer.threshold)
+        hm_trigger_rehashing(hmap);
+    hm_help_rehashing(hmap);
+}

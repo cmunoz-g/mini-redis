@@ -16,25 +16,23 @@ static uint64_t hash(const uint8_t *data, size_t len) { // review
     return h;
 }
 
-void do_get(HMap *db, std::vector<std::string> &cmd, Response &resp) {
+void do_get(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
     Entry key;
     key.key.swap(cmd[1]);
     key.node.hcode = hash(reinterpret_cast<uint8_t *>(key.key.data()), key.key.size());
-    HNode *node = hm_lookup(db, &key.node, &entry_eq);
+    HNode *node = hm_lookup(&db, &key.node, &entry_eq);
     if (!node) { resp.status = RES_KEY_NOT_FOUND; return; }
     
     const std::string &val = container_of(node, Entry, node)->value;
     assert(val.size() <= MSG_SIZE_LIMIT); 
-    resp.data.assign(val.begin(), val.end());
+    return out_str(out, val.data(), val.size()); // why return ?
 }
 
-// for set and del, take out response ?
-
-void do_set(HMap *db, std::vector<std::string> &cmd, Response &) {
+void do_set(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
     Entry key;
     key.key.swap(cmd[1]);
     key.node.hcode = hash(reinterpret_cast<uint8_t*>(key.key.data()), key.key.size());
-    HNode *node = hm_lookup(db, &key.node, &entry_eq);
+    HNode *node = hm_lookup(&db, &key.node, &entry_eq);
     if (node)
         container_of(node, Entry, node)->value.swap(cmd[2]);
     else {
@@ -42,16 +40,18 @@ void do_set(HMap *db, std::vector<std::string> &cmd, Response &) {
         ent->key.swap(key.key);
         ent->node.hcode = key.node.hcode;
         ent->value.swap(cmd[2]);
-        hm_insert(db, &ent->node);
+        hm_insert(&db, &ent->node);
     }
+    return out_nil(out);
 }
-void do_del(HMap *db, std::vector<std::string> &cmd, Response &resp) {
+void do_del(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
     Entry key;
     key.key.swap(cmd[1]);
     key.node.hcode = hash(reinterpret_cast<uint8_t*>(key.key.data()), key.key.size());
 
-    HNode *node = hm_delete(db, &key.node, &entry_eq);
+    HNode *node = hm_delete(&db, &key.node, &entry_eq);
     if (node) {
         delete container_of(node, Entry, node);
     }
+    return out_int(out, node ? 1 : 0);
 }

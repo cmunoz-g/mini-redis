@@ -13,10 +13,27 @@ enum {
     RES_KEY_NOT_FOUND = 2
 };
 
-struct Response {
-    uint32_t status = 0;
-    std::vector<uint8_t> data;
+enum {
+    TAG_NIL = 0,
+    TAG_ERR = 1,
+    TAG_STR = 2,
+    TAG_INT = 3,
+    TAG_DBL = 4,
+    TAG_ARR = 5
+};
+
+enum {
+    ERR_UNKNOWN = 1,
+    ERR_TOO_BIG = 2
 };
 
 int32_t parse_request(const uint8_t *data, const size_t size, std::vector<std::string> &out);
-void do_response(const Response &resp, Buffer &out);
+void response_begin(Buffer &out, size_t *header);
+void response_end(Buffer &out, size_t header);
+
+/* Serialization */
+void out_nil(Buffer &out);
+void out_str(Buffer &out, const char *s, size_t size);
+void out_int(Buffer &out, int64_t val);
+void out_arr(Buffer &out, uint32_t n);
+void out_err(Buffer &out, uint32_t code, const char *msg);

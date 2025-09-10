@@ -16,19 +16,19 @@ struct Conn {
     Buffer in, out;
 };
 
-static void do_request(HMap &db, std::vector<std::string> &cmd, Response &resp) { // could I copy directly to conn->out instead of passing though Response
+static void do_request(HMap &db, std::vector<std::string> &cmd, Buffer &out) { 
     if (cmd.size() == 2 && cmd[0] == "get") {
-        return do_get(db, cmd, resp);  
+        return do_get(db, cmd, out);  
     }
     else if (cmd.size() == 3 && cmd[0] == "set") {
-        return do_set(db, cmd, resp);
+        return do_set(db, cmd, out);
     }
     else if (cmd.size() == 2 && cmd[0] == "del") {
-        do_del(db, cmd, resp);
+        do_del(db, cmd, out);
     }
-    else {
-        resp.status = RES_ERR;
-    }
+    // else {
+    //     out.status = RES_ERR;
+    // }
 }
 
 static bool handle_request(HMap &db, Conn *conn) {
@@ -52,9 +52,10 @@ static bool handle_request(HMap &db, Conn *conn) {
         return false;
     }
 
-    Response resp;
-    do_request(db, cmd, resp);
-    do_response(resp, conn->out);
+    size_t header_pos = 0;
+    response_begin(conn->out, &header_pos);
+    do_request(db, cmd, conn->out);
+    response_end(conn->out, header_pos);
 
     return true;
 }

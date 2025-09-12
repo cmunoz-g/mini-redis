@@ -1,5 +1,6 @@
-#include "kv.hh"
+#include "commands.hh"
 #include "utils.hh"
+#include "hashtable.hh"
 #include <cassert>
 
 static bool entry_eq(HNode *lhs, HNode *rhs) {
@@ -21,7 +22,7 @@ void do_get(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
     key.key.swap(cmd[1]);
     key.node.hcode = hash(reinterpret_cast<uint8_t *>(key.key.data()), key.key.size());
     HNode *node = hm_lookup(&db, &key.node, &entry_eq);
-    if (!node) { resp.status = RES_KEY_NOT_FOUND; return; }
+    if (!node) return;
     
     const std::string &val = container_of(node, Entry, node)->value;
     assert(val.size() <= MSG_SIZE_LIMIT); 
@@ -54,4 +55,15 @@ void do_del(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
         delete container_of(node, Entry, node);
     }
     return out_int(out, node ? 1 : 0);
+}
+
+static bool cb_keys(HNode *node, void *arg) {
+    Buffer &out = *(static_cast<Buffer *>(arg));
+    const std::string &key = container_of(node, Entry, node)->key;
+    out_str(out, key.data(), key.size());
+}
+
+bool do_keys(HMap &db, Buffer &out) { // should be bool ? what should i do with result
+    out_arr(out, static_cast<uint32_t>(hm_size(&db)));
+    return hm_foreach(&db, &cb_keys, (void *)&out);
 }

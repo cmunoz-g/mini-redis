@@ -2,8 +2,6 @@
 #include <cstring>
 #include <limits>
 
-// test
-
 /* Helpers */
 static bool read_str(const uint8_t *&cur, const uint8_t *end, const size_t n, std::string &out) {
     if (cur + n > end) return false;
@@ -45,16 +43,21 @@ void response_begin(Buffer &out, size_t *header) {
 }
 
 static size_t response_size(Buffer &out, size_t header) {
-    size_t size = out.data_end - out.data_begin;
-    return size - header + 4;
+    size_t size = buf_size(out);
+    return size - header + sizeof(uint32_t);
 }
 
 void response_end(Buffer &out, size_t header) {
     size_t msg_size = response_size(out, header);
     if (msg_size > MSG_SIZE_LIMIT) {
-        // out.resize(header + 4)
+        buf_truncate(out, header + sizeof(uint32_t));
         out_err(out, ERR_TOO_BIG, "response is too big");
+        msg_size = response_size(out, header);
     }
+
+    uint32_t len = static_cast<uint32_t>(msg_size);
+    uint32_t be = htobe32(len);
+    std::memcpy(buf_at(out, header), &be, sizeof(uint32_t));
 }
 
 /* Serialization */

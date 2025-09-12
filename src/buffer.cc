@@ -2,12 +2,32 @@
 #include <cstring>
 #include <cassert>
 
+/* Utils */
+
+inline size_t buf_size(const Buffer &b) {
+    return static_cast<size_t>(b.data_end - b.data_begin);
+}
+
+inline uint8_t *buf_at(Buffer &b, size_t off) {
+    size_t used = buf_size(b);
+    if (off > used) return nullptr;
+    return b.data_begin + off;
+}
+
+inline void buf_truncate(Buffer &b, size_t new_size) {
+    size_t used = buf_size(b);
+    if (new_size > used) return;
+    b.data_end = b.data_begin + new_size;
+}
+
+/* Append & consume*/
+
 void buf_append(Buffer &buf, const uint8_t *data, size_t len) {
     if (len == 0) return;
     assert(buf.buffer_begin <= buf.data_begin
         && buf.data_begin <= buf.data_end && buf.data_end <= buf.buffer_end);
 
-    size_t used = static_cast<size_t>(buf.data_end - buf.data_begin);
+    size_t used = buf_size(buf);
     size_t free = static_cast<size_t>(buf.buffer_end - buf.data_end);
 
     if (free < len) {
@@ -24,7 +44,7 @@ void buf_append(Buffer &buf, const uint8_t *data, size_t len) {
 }
 
 void buf_consume(Buffer &buf, size_t n) {
-    size_t used = static_cast<size_t>(buf.data_end - buf.data_begin);
+    size_t used = buf_size(buf);
     assert(n <= used);
 
     buf.data_begin += n;

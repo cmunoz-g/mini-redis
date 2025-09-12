@@ -42,6 +42,18 @@ static HNode *h_detach(HTab *htab, HNode **from) {
     return node;
 }
 
+static bool h_foreach(HTab *htab, bool (*f)(HNode *, void *), void *arg) {
+    if (htab->mask == 0) return true;
+
+    const size_t buckets = htab->mask + 1;
+    for (size_t i = 0; i < buckets; ++i) {
+        for (HNode *node = htab->tab[i]; node; node = node->next) {
+            if (!f(node, arg)) return false;
+        }
+    }
+    return true;
+}
+
 /* HMap rehashing functions */
 static void hm_help_rehashing(HMap *hmap) {
     size_t nwork = 0;
@@ -98,4 +110,12 @@ void hm_insert(HMap *hmap, HNode *node) {
     if (!hmap->older.tab && hmap->newer.size >= hmap->newer.threshold)
         hm_trigger_rehashing(hmap);
     hm_help_rehashing(hmap);
+}
+
+size_t hm_size(HMap *hmap) {
+    return (hmap->newer.size + hmap->older.size);
+}
+
+bool hm_foreach(HMap *hmap, bool (*f)(HNode *, void *), void *arg) {
+    return h_foreach(&hmap->newer, f, arg) && h_foreach(&hmap->older, f, arg);
 }

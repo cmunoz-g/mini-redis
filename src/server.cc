@@ -1,6 +1,6 @@
 #include "server.hh"
 #include "socket.hh"
-#include "kv.hh"
+#include "commands.hh"
 #include <poll.h>
 #include <cstring>
 #include <assert.h>
@@ -24,11 +24,15 @@ static void do_request(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
         return do_set(db, cmd, out);
     }
     else if (cmd.size() == 2 && cmd[0] == "del") {
-        do_del(db, cmd, out);
+        return do_del(db, cmd, out);
     }
-    // else {
-    //     out.status = RES_ERR;
-    // }
+    else if (cmd.size() == 1 && cmd[0] == "keys") {
+        // return do_keys(cmd, out);
+        do_keys(db, out); //should be bool ? void ?
+    }
+    else {
+        return out_err(out, ERR_UNKNOWN, "unknown command");
+    }
 }
 
 static bool handle_request(HMap &db, Conn *conn) {

@@ -1,6 +1,7 @@
 #include "avltree.hh"
 #include <cstdint>
 #include <algorithm>
+#include <cassert>
 
 struct AVLNode {
     AVLNode *parent;
@@ -81,5 +82,56 @@ static AVLNode *avl_fix_right(AVLNode *node) {
 } 
 
 AVLNode *avl_fix(AVLNode *node) {
+    for (;;) {
+        AVLNode **from = &node;
+        AVLNode *parent = node->parent;
+        if (parent)
+            from = parent->l == node ? &parent->l : &parent->r;
+        
+        avl_update(node);
+        uint32_t l = avl_height(node->l);
+        uint32_t r = avl_height(node->r);
+
+        if (l == r + 2) *from = avl_fix_left(node);
+        else if (l + 2 == r) *from = avl_fix_right(node);
+
+        if (!parent) return *from;
+
+        node = parent;
+    }
+}
+
+static AVLNode *avl_del_one_empty_child(AVLNode *node) {
+    assert(!node->l || !node->r);
+
+    AVLNode *child = node->l ? node->l : node->r;
+    AVLNode *parent = node->parent;
+
+    if (child) child->parent = parent;
+    if (!parent) return child;
+
+    AVLNode **from = parent->l == node ? &parent->l : &parent->r;
+    *from = child;
+
+    return avl_fix(parent);
+}
+
+AVLNode *avl_del(AVLNode *node) {
+    if (!node->l || !node->r) return avl_del_one_empty_child(node);
+
+    AVLNode *successor = node->r;
+    while (successor->l) successor = successor->l;
+
+    AVLNode *root = avl_del_one_empty_child(successor);
+    *successor = *node; // successor copies the data of node
+    // meaning: s->l, s->r and s->parent are now those of node
+    if (successor->l) successor->l->parent = successor;
+    if (successor->r) successor->r->parent = successor;
+
+    AVLNode **from = &root;
+    AVLNode *parent = node->parent;
     
+    if (parent) from = parent->l == node ? &parent->l : &parent->r;
+    *from = successor;
+    return root;
 }

@@ -10,7 +10,7 @@ struct AVLNode {
     uint32_t height = 0;
 };
 
-inline void avl_init(AVLNode *node) {
+void avl_init(AVLNode *node) {
     node->l = node->r = node->parent = nullptr;
     node->height = 1;
 }

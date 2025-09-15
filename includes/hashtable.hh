@@ -24,6 +24,7 @@ struct HMap {
 /* API */
 //void hm_init(HMap*); // do i need these ?
 //void hm_destroy(HMap*); // 
+uint64_t hash(const uint8_t *data, size_t len); // should it be moved elsewhere ?
 void hm_insert(HMap *hmap, HNode *node);
 HNode *hm_lookup(HMap *hmap, HNode *key, bool (*eq)(HNode*, HNode*));
 HNode *hm_delete(HMap *hmap, HNode *key, bool (*eq)(HNode *, HNode *));

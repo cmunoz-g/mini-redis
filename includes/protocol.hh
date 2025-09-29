@@ -24,7 +24,9 @@ enum {
 
 enum {
     ERR_UNKNOWN = 1,
-    ERR_TOO_BIG = 2
+    ERR_TOO_BIG = 2,
+    ERR_BAD_TYPE = 3,
+    ERR_BAD_ARG = 4
 };
 
 int32_t parse_request(const uint8_t *data, const size_t size, std::vector<std::string> &out);

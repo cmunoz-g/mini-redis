@@ -1,6 +1,7 @@
 #include "protocol.hh"
 #include <cstring>
 #include <limits>
+#include <cassert>
 
 /* Helpers */
 static bool read_str(const uint8_t *&cur, const uint8_t *end, const size_t n, std::string &out) {
@@ -110,4 +111,27 @@ void out_err(Buffer &out, uint32_t code, const std::string &msg) {
     uint32_t size_be = htobe32(len);
 
     buf_append(out, reinterpret_cast<const uint8_t *>(&msg), size);
+}
+
+void out_dbl(Buffer &out, double val) { // assumes IEEE-754 and BE
+    uint8_t tag = TAG_DBL;
+    buf_append(out, &tag, sizeof(tag));
+    buf_append(out, reinterpret_cast<uint8_t *>(&val), sizeof(val));
+}
+
+size_t out_begin_arr(Buffer &out) {
+    uint8_t tag = TAG_ARR;
+    buf_append(out, &tag, sizeof(tag));
+
+    uint32_t zero = 0;
+    buf_append(out, reinterpret_cast<uint8_t *>(&zero), sizeof(zero));
+    return buf_size(out) - sizeof(zero);
+}
+
+void out_end_arr(Buffer &out, size_t ctx, uint32_t n) {
+    uint8_t tag = *buf_at(out, ctx - 1);
+    assert(tag == TAG_ARR);
+
+    uint32_t be = htobe32(n);
+    memcpy(buf_at(out, ctx), &be, sizeof(be));
 }

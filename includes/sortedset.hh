@@ -18,3 +18,10 @@ struct HKey {
     const char *name = nullptr;
     size_t len = 0;
 };
+
+// review what should be API
+ZNode *zset_seekge(ZSet *zset, double score, const char *name, size_t len);
+ZNode *znode_offset(ZNode *node, int64_t offset);
+void zset_delete(ZSet *zset, ZNode *node);
+bool zset_insert(ZSet *zset, const char *name, size_t len, double score);
+ZNode *zset_lookup(ZSet *zset, const char *name, size_t len);

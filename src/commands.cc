@@ -2,6 +2,7 @@
 #include "entry.hh"
 #include "utils.hh"
 #include "hashtable.hh"
+#include "sortedset.hh"
 #include <cassert>
 #include <cmath>
 
@@ -86,11 +87,8 @@ static bool str_to_int(const std::string s, int64_t &i) {
     return endp == s.c_str() + s.size();
 }
 
+// missing: a reversed verseion that does seek and iterate in descending order
 void do_zquery(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
-    // parse zquery zset score name offset limit from str to each respective type
-    // seek to the key
-    // output
-
     ZSet *zset = expect_zset(db, cmd[1]);
     if (!zset) return out_err(out, ERR_BAD_TYPE, "expect zset");
 
@@ -104,5 +102,16 @@ void do_zquery(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
     if (!str_to_int(cmd[4], offset) || !str_to_int(cmd[5], limit))
         return out_err(out, ERR_BAD_ARG, "expected int");
     
-        // unfinished
+    ZNode *znode = zset_seekge(zset, score, name.data(), name.size());
+    znode = znode_offset(znode, offset);
+
+    size_t ctx = out_begin_arr(out);
+    int64_t n = 0;
+    while (znode && n < limit) {
+        out_str(out, znode->name, znode->len);
+        out_dbl(out, znode->score);
+        znode = znode_offset(znode, +1);
+        n += 2;
+    }
+    out_end_arr(out, ctx, static_cast<uint32_t>(n));
 }

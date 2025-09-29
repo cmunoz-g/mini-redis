@@ -39,3 +39,6 @@ void out_str(Buffer &out, const char *s, size_t size);
 void out_int(Buffer &out, int64_t val);
 void out_arr(Buffer &out, uint32_t n);
 void out_err(Buffer &out, uint32_t code, const char *msg);
+void out_dbl(Buffer &out, double val);
+size_t out_begin_arr(Buffer &out);
+void out_end_arr(Buffer &out, size_t ctx, uint32_t n);

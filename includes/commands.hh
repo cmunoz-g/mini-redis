@@ -9,4 +9,8 @@
 void do_set(HMap &db, std::vector<std::string> &cmd, Buffer &out);
 void do_get(HMap &db, std::vector<std::string> &cmd, Buffer &out);
 void do_del(HMap &db, std::vector<std::string> &cmd, Buffer &out);
-bool do_keys(HMap &db, Buffer &out);
+void do_keys(HMap &db, std::vector<std::string> &cmd, Buffer &out);
+void do_zscore(HMap &db, std::vector<std::string> &cmd, Buffer &out);
+void do_zrem(HMap &db, std::vector<std::string> &cmd, Buffer &out);
+void do_zadd(HMap &db, std::vector<std::string> &cmd, Buffer &out);
+void do_zquery(HMap &db, std::vector<std::string> &cmd, Buffer &out);

@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <netinet/in.h>
+#include <unordered_map>
 
 static constexpr size_t BUFFER_SIZE_KB = 64;
 static constexpr size_t BYTES_IN_KB = 1024;
@@ -16,23 +17,36 @@ struct Conn {
     Buffer in, out;
 };
 
-static void do_request(HMap &db, std::vector<std::string> &cmd, Buffer &out) { 
-    if (cmd.size() == 2 && cmd[0] == "get") {
-        return do_get(db, cmd, out);  
-    }
-    else if (cmd.size() == 3 && cmd[0] == "set") {
-        return do_set(db, cmd, out);
-    }
-    else if (cmd.size() == 2 && cmd[0] == "del") {
-        return do_del(db, cmd, out);
-    }
-    else if (cmd.size() == 1 && cmd[0] == "keys") {
-        // return do_keys(cmd, out);
-        do_keys(db, out); //should be bool ? void ?
-    }
-    else {
-        return out_err(out, ERR_UNKNOWN, "unknown command");
-    }
+// Move Command and command_list elsewhere ?
+
+using Handler = void(*)(HMap &, std::vector<std::string> &, Buffer &);
+
+struct Command {
+    size_t arity;
+    Handler f;
+};
+
+static const std::unordered_map<std::string, Command> command_list {
+    {"get", {2, do_get}},
+    {"set", {3, do_set}},
+    {"del", {2, do_del}},
+    {"keys", {1, do_keys}},
+    {"zadd", {4, do_zadd}},
+    {"zrem", {3, do_zrem}},
+    {"zscore", {3, do_zscore}},
+    {"zquery", {6, do_zquery}},
+};
+
+static void do_request(HMap &db, std::vector<std::string> &cmd, Buffer &out) { // make this bool ?
+    if (cmd.empty()) return out_err(out, ERR_EMPTY, "empty command");
+
+    auto it = command_list.find(cmd[0]);
+    if (it == command_list.end()) return out_err(out, ERR_UNKNOWN, "unknown command");
+
+    const Command c = it->second;
+    if (cmd.size() != c.arity) return out_err(out, ERR_BAD_ARG, "wrong number of arguments");
+    
+    return c.f(db, cmd, out);
 }
 
 static bool handle_request(HMap &db, Conn *conn) {

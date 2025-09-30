@@ -1,5 +1,7 @@
 #pragma once
 
+#include "avltree.hh"
+
 struct ZSet {
     AVLNode *root = nullptr; // index by score, name
     HMap hmap; // index by name

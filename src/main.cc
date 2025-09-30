@@ -1,6 +1,8 @@
 #include "server.hh"
 
 int main(void) {
-    HMap db = HMap{};
-    return run_server(db, "0.0.0.0", 1234);
+    g_data data{};
+    dlist_init(&data.idle_list);
+
+    return run_server(data, "0.0.0.0", 1234);
 }

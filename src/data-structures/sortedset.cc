@@ -1,6 +1,5 @@
 #include "sortedset.hh"
 #include "hashtable.hh"
-#include "avltree.hh"
 #include "utils.hh"
 #include <cstdlib>
 #include <cstring>

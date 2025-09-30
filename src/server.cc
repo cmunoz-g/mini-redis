@@ -1,6 +1,7 @@
 #include "server.hh"
 #include "socket.hh"
 #include "commands.hh"
+#include "timer.hh"
 #include <poll.h>
 #include <cstring>
 #include <assert.h>
@@ -10,13 +11,6 @@
 
 static constexpr size_t BUFFER_SIZE_KB = 64;
 static constexpr size_t BYTES_IN_KB = 1024;
-
-struct Conn {
-    int fd{-1};
-    bool want_read{true}, want_write{false}, want_close{false};
-    Buffer in, out;
-};
-
 // Move Command and command_list elsewhere ?
 
 using Handler = void(*)(HMap &, std::vector<std::string> &, Buffer &);
@@ -132,8 +126,14 @@ static Conn *handle_accept(int fd) {
     return conn;
 }
 
+void handle_destroy(Conn *c, std::vector<Conn *> &fd2conn) {
+    (void)::close(c->fd); // c++ cast ?
+    fd2conn[c->fd] = nullptr;
+    dlist_detach(&c->idle_node);
+    delete c;
+}
 
-int run_server(HMap &db, const char* host, uint16_t port) {
+int run_server(g_data &data, const char* host, uint16_t port) {
     int server_fd = socket_listen(host, port);
     if (server_fd < 0) return 1; // think through error mgmt
 
@@ -153,7 +153,8 @@ int run_server(HMap &db, const char* host, uint16_t port) {
             pfds.push_back(pfd);
         }
         
-        int rv = ::poll(pfds.data(), (nfds_t)pfds.size(), -1);
+        int32_t timeout_ms = next_timer_ms(data.idle_list);
+        int rv = ::poll(pfds.data(), (nfds_t)pfds.size(), timeout_ms);
         if (rv < 0) {
             if (errno == EINTR) continue;
             //else manage fatal error 
@@ -168,15 +169,19 @@ int run_server(HMap &db, const char* host, uint16_t port) {
 
         for (size_t i = 1; i < pfds.size(); ++i) {
             uint32_t re = pfds[i].revents;
+            if (re == 0) continue;
+
             Conn *c = fd2conn[pfds[i].fd];
-            if (re & POLLIN) handle_read(db, c);
+
+            c->last_active_ms = get_monotonic_msec();
+            dlist_detach(&c->idle_node);
+            dlist_insert_before(&data.idle_list, &c->idle_node);
+
+            if (re & POLLIN) handle_read(data.db, c);
             if (re & POLLOUT) handle_write(c);
-            if (re & POLLERR || c->want_close) {
-                (void)close(c->fd);
-                fd2conn[c->fd] = nullptr; // is this correct ?
-                delete c;
-            }
+            if (re & POLLERR || c->want_close) handle_destroy(c, fd2conn);
         }
+        process_timers(data.idle_list, fd2conn);
     } 
 
     return (0);

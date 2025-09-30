@@ -14,6 +14,6 @@ Entry *entry_new(uint32_t type) {
 }
 
 void entry_del(Entry *ent) {
-    if (ent->type == T_ZSET) zset_clear(&ent->zset);
+    if (ent->type == T_ZSET) zset_destroy(&ent->zset);
     delete ent;
 }

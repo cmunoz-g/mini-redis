@@ -126,3 +126,14 @@ ZNode *znode_offset(ZNode *node, int64_t offset) {
     return tnode ? container_of(tnode, ZNode, tree) : nullptr;
 }
 
+static void tree_destroy(AVLNode *node) {
+    tree_destroy(node->l);
+    tree_destroy(node->r);
+    znode_del(container_of(node, ZNode, tree));
+}
+
+void zset_destroy(ZSet *zset) {
+    hm_destroy(&zset->hmap);
+    tree_destroy(zset->root);
+    zset->root = nullptr;
+}

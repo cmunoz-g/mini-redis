@@ -5,6 +5,7 @@ struct AVLNode {
     AVLNode *r;
     AVLNode *l;
     uint32_t height = 0;
+    uint32_t count = 0;
 };
 
 void avl_init(AVLNode *node);

@@ -3,24 +3,23 @@
 #include <algorithm>
 #include <cassert>
 
-struct AVLNode {
-    AVLNode *parent;
-    AVLNode *r;
-    AVLNode *l;
-    uint32_t height = 0;
-};
-
 void avl_init(AVLNode *node) {
     node->l = node->r = node->parent = nullptr;
     node->height = 1;
+    node->count = 1;
 }
 
 static uint32_t avl_height(AVLNode *node) {
     return node ? node->height : 0;
 }
 
+static uint32_t avl_count(AVLNode *node) {
+    return node ? node->count : 0;
+}
+
 static void avl_update(AVLNode *node) {
     node->height = 1 + std::max(avl_height(node->l), avl_height(node->r));
+    node->count = 1 + avl_count(node->l) + avl_count(node->r);
 }
 
 static uint8_t avl_get_height_diff(AVLNode *node) {
@@ -136,4 +135,35 @@ AVLNode *avl_del(AVLNode *node) {
     return root;
 }
 
-AVLNode *avl_offset(AVLNode *node, int64_t offset);
+AVLNode *avl_offset(AVLNode *node, int64_t offset) {
+    int64_t pos = 0;
+
+    while (offset != pos) {
+        if (pos < offset && pos + avl_count(node->r) >= offset) {
+            node = node->r;
+            pos += avl_count(node->l) + 1;
+        }
+        else if (pos > offset && pos - avl_count(node->l) <= offset) {
+            node = node->l;
+            pos -= avl_count(node->r) + 1;
+        }
+        else {
+            AVLNode *parent = node->parent;
+            if (!parent) return nullptr;
+            if (parent->r) pos -= avl_count(node->l) + 1;
+            else pos += avl_count(node->r) + 1;
+            node = parent; 
+        }
+    }
+    return node;
+}
+
+uint64_t avl_rank(AVLNode *node) {
+    uint64_t rank = avl_count(node->l);
+    while (node->parent) {
+        AVLNode *parent = node->parent;
+        if (parent->r == node) rank += avl_count(parent->l) + 1;
+        node = parent;
+    }
+    return rank;
+}

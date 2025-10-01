@@ -13,7 +13,7 @@ static constexpr size_t BUFFER_SIZE_KB = 64;
 static constexpr size_t BYTES_IN_KB = 1024;
 // Move Command and command_list elsewhere ?
 
-using Handler = void(*)(HMap &, std::vector<std::string> &, Buffer &);
+using Handler = void(*)(g_data &, std::vector<std::string> &, Buffer &);
 
 struct Command {
     size_t arity;
@@ -29,9 +29,10 @@ static const std::unordered_map<std::string, Command> command_list {
     {"zrem", {3, do_zrem}},
     {"zscore", {3, do_zscore}},
     {"zquery", {6, do_zquery}},
+    {"expire", {3, do_expire}},
 };
 
-static void do_request(HMap &db, std::vector<std::string> &cmd, Buffer &out) { // make this bool ?
+static void do_request(g_data &data, std::vector<std::string> &cmd, Buffer &out) { // make this bool ?
     if (cmd.empty()) return out_err(out, ERR_EMPTY, "empty command");
 
     auto it = command_list.find(cmd[0]);
@@ -40,10 +41,10 @@ static void do_request(HMap &db, std::vector<std::string> &cmd, Buffer &out) { /
     const Command c = it->second;
     if (cmd.size() != c.arity) return out_err(out, ERR_BAD_ARG, "wrong number of arguments");
     
-    return c.f(db, cmd, out);
+    return c.f(data, cmd, out);
 }
 
-static bool handle_request(HMap &db, Conn *conn) {
+static bool handle_request(g_data &data, Conn *conn) {
     size_t size = conn->in.data_end - conn->in.data_begin;
     if (size < 4) return false;
 
@@ -66,7 +67,7 @@ static bool handle_request(HMap &db, Conn *conn) {
 
     size_t header_pos = 0;
     response_begin(conn->out, &header_pos);
-    do_request(db, cmd, conn->out);
+    do_request(data, cmd, conn->out);
     response_end(conn->out, header_pos);
 
     return true;
@@ -107,7 +108,7 @@ static void handle_read(g_data &data, Conn *conn) {
     dlist_insert_before(&data.read_list, &conn->read_node);
     
     buf_append(conn->in, buf, static_cast<size_t>(rv));
-    while (handle_request(data.db, conn)) {};
+    while (handle_request(data, conn)) {};
     if (conn->out.data_begin != conn->out.data_end) {
         conn->want_read = false;
         conn->want_write = true;

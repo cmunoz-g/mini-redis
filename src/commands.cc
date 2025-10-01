@@ -1,4 +1,5 @@
 #include "commands.hh"
+#include "server.hh"
 #include "entry.hh"
 #include "utils.hh"
 #include "hashtable.hh"
@@ -6,12 +7,12 @@
 #include <cassert>
 #include <cmath>
 
-void do_get(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
+void do_get(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
     LookupKey key;
     key.key.swap(cmd[1]);
     key.node.hcode = hash(reinterpret_cast<uint8_t *>(key.key.data()), key.key.size());
     
-    HNode *node = hm_lookup(&db, &key.node, &entry_eq);
+    HNode *node = hm_lookup(&data.db, &key.node, &entry_eq);
     if (!node) return out_nil(out);
 
     Entry *ent = container_of(node, Entry, node);
@@ -20,11 +21,11 @@ void do_get(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
     return out_str(out, ent->str.data(), ent->str.size());
 }
 
-void do_set(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
+void do_set(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
     LookupKey key;
     key.key.swap(cmd[1]);
     key.node.hcode = hash(reinterpret_cast<uint8_t *>(key.key.data()), key.key.size());
-    HNode *node = hm_lookup(&db, &key.node, &entry_eq);
+    HNode *node = hm_lookup(&data.db, &key.node, &entry_eq);
 
     if (node) {
         Entry *ent = container_of(node, Entry, node);
@@ -36,18 +37,18 @@ void do_set(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
         ent->key.swap(key.key);
         ent->node.hcode = key.node.hcode;
         ent->str.swap(cmd[2]);
-        hm_insert(&db, &ent->node);
+        hm_insert(&data.db, &ent->node);
     }
     return out_nil(out);
 }
 
-void do_del(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
+void do_del(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
     LookupKey key;
     key.key.swap(cmd[2]);
     key.node.hcode = hash(reinterpret_cast<uint8_t *>(key.key.data()), key.key.size());
-    HNode *node = hm_lookup(&db, &key.node, &entry_eq);
+    HNode *node = hm_lookup(&data.db, &key.node, &entry_eq);
 
-    if (node) entry_del(container_of(node, Entry, node));
+    if (node) entry_del(data.heap, container_of(node, Entry, node));
 
     return out_int(out, node ? 1 : 0);
 }
@@ -59,11 +60,11 @@ static bool cb_keys(HNode *node, void *arg) {
     //return true;
 }
 
-void do_keys(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
+void do_keys(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
     // is it correct for this ft to receive &cmd even though it doesnt use them ? Only doing it so the compiler doesnt complain in command_list
     // would be either this or changing up do_request()
-    out_arr(out, static_cast<uint32_t>(hm_size(&db)));
-    hm_foreach(&db, &cb_keys, (void *)&out);
+    out_arr(out, static_cast<uint32_t>(hm_size(&data.db)));
+    hm_foreach(&data.db, &cb_keys, (void *)&out);
 }
 
 static ZSet k_empty_set{}; // empty zset. should it be in a header ? if so, inline constexpr ?
@@ -95,8 +96,8 @@ static bool str_to_int(const std::string s, int64_t &i) {
 }
 
 // missing: a reversed verseion that does seek and iterate in descending order
-void do_zquery(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
-    ZSet *zset = expect_zset(db, cmd[1]);
+void do_zquery(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
+    ZSet *zset = expect_zset(data.db, cmd[1]);
     if (!zset) return out_err(out, ERR_BAD_TYPE, "expect zset");
 
     double score = 0;
@@ -124,7 +125,7 @@ void do_zquery(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
 }
 
 // zadd zset score name
-void do_zadd(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
+void do_zadd(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
     double score = 0;
     if (!str_to_double(cmd[2], score)) out_err(out, ERR_BAD_ARG, "expected fp number");
 
@@ -133,14 +134,14 @@ void do_zadd(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
     LookupKey key;
     key.key.swap(cmd[1]);
     key.node.hcode = hash(reinterpret_cast<uint8_t *>(key.key.data()), key.key.size());
-    HNode *node = hm_lookup(&db, &key.node, &entry_eq);
+    HNode *node = hm_lookup(&data.db, &key.node, &entry_eq);
 
     Entry *ent = nullptr;
     if (!node) {
         ent = entry_new(T_ZSET);
         ent->key.swap(key.key);
         ent->node.hcode = key.node.hcode;
-        hm_insert(&db, &ent->node);
+        hm_insert(&data.db, &ent->node);
     }
     else {
         ent = container_of(node, Entry, node);
@@ -152,8 +153,8 @@ void do_zadd(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
     return out_int(out, static_cast<int64_t>(added));
 }
 
-void do_zrem(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
-    ZSet *zset = expect_zset(db, cmd[1]);
+void do_zrem(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
+    ZSet *zset = expect_zset(data.db, cmd[1]);
     if (!zset) out_err(out, ERR_BAD_TYPE, "expected zset");
 
     const std::string &name = cmd[2];
@@ -162,11 +163,28 @@ void do_zrem(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
     return out_int(out, znode ? 1 : 0);
 }
 
-void do_zscore(HMap &db, std::vector<std::string> &cmd, Buffer &out) {
-    ZSet *zset = expect_zset(db, cmd[1]);
+void do_zscore(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
+    ZSet *zset = expect_zset(data.db, cmd[1]);
     if (!zset) out_err(out, ERR_BAD_TYPE, "expected zset");
     
     const std::string &name = cmd[2];
     ZNode *znode = zset_lookup(zset, name.data(), name.size());
     return znode ? out_dbl(out, znode->score) : out_nil(out);
+}
+
+void do_expire(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
+    int64_t ttl_ms = 0;
+    if (!str_to_int(cmd[2], ttl_ms)) return out_err(out, ERR_BAD_TYPE, "expected int");
+
+    LookupKey key;
+    key.key.swap(cmd[1]);
+    key.node.hcode = hash(reinterpret_cast<uint8_t *>(key.key.data()), key.key.size());
+    HNode *node = hm_lookup(&data.db, &key.node, &entry_eq);
+
+    if (node) {
+        Entry *ent = container_of(node, Entry, node);
+        entry_set_ttl(data.heap, ent, ttl_ms);
+    }
+    
+    return out_int(out, node ? 1 : 0);
 }

@@ -6,11 +6,12 @@
 #include <string>
 #include <vector>
 
-void do_set(HMap &db, std::vector<std::string> &cmd, Buffer &out);
-void do_get(HMap &db, std::vector<std::string> &cmd, Buffer &out);
-void do_del(HMap &db, std::vector<std::string> &cmd, Buffer &out);
-void do_keys(HMap &db, std::vector<std::string> &cmd, Buffer &out);
-void do_zscore(HMap &db, std::vector<std::string> &cmd, Buffer &out);
-void do_zrem(HMap &db, std::vector<std::string> &cmd, Buffer &out);
-void do_zadd(HMap &db, std::vector<std::string> &cmd, Buffer &out);
-void do_zquery(HMap &db, std::vector<std::string> &cmd, Buffer &out);
+void do_set(g_data &data, std::vector<std::string> &cmd, Buffer &out);
+void do_get(g_data &data, std::vector<std::string> &cmd, Buffer &out);
+void do_del(g_data &data, std::vector<std::string> &cmd, Buffer &out);
+void do_keys(g_data &data, std::vector<std::string> &cmd, Buffer &out);
+void do_zscore(g_data &data, std::vector<std::string> &cmd, Buffer &out);
+void do_zrem(g_data &data, std::vector<std::string> &cmd, Buffer &out);
+void do_zadd(g_data &data, std::vector<std::string> &cmd, Buffer &out);
+void do_zquery(g_data &data, std::vector<std::string> &cmd, Buffer &out);
+void do_expire(g_data &data, std::vector<std::string> &cmd, Buffer &out);

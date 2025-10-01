@@ -86,6 +86,10 @@ static void hm_trigger_rehashing(HMap *hmap) {
 
 /* API */
 
+bool hnode_same(HNode *node, HNode *key) {
+    return node == key;
+}
+
 uint64_t hash(const uint8_t *data, size_t len) { // review
     uint32_t h = 0x811C9DC5;
     for (size_t i = 0; i < len; ++i) {

@@ -3,6 +3,7 @@
 #include "hashtable.hh"
 #include "protocol.hh"
 #include "dlist.hh"
+#include "heap.hh"
 
 struct Conn { 
     int fd{-1};
@@ -15,6 +16,7 @@ struct Conn {
 struct g_data {
     HMap db;
     DList idle_list, write_list, read_list;
+    std::vector<HeapItem> heap;
 };
 
 int run_server(g_data &data, const char* host, uint16_t port);

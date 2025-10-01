@@ -72,7 +72,7 @@ static bool handle_request(HMap &db, Conn *conn) {
     return true;
 }
 
-static void handle_write(Conn *conn) {
+static void handle_write(DList &write_list, Conn *conn) {
     size_t size = conn->out.data_end - conn->out.data_begin;
 
     assert(size > 0);
@@ -83,6 +83,10 @@ static void handle_write(Conn *conn) {
         return;
     }
 
+    conn->last_write_ms = get_monotonic_msec();
+    dlist_detach(&conn->write_node);
+    dlist_insert_before(&write_list, &conn->write_node);
+
     buf_consume(conn->out, static_cast<size_t>(rv));
     if (conn->out.data_begin == conn->out.data_end) {
         conn->want_read = true;
@@ -90,19 +94,24 @@ static void handle_write(Conn *conn) {
     }
 }
 
-static void handle_read(HMap &db, Conn *conn) {
+static void handle_read(g_data &data, Conn *conn) {
     uint8_t buf[BUFFER_SIZE_KB * BYTES_IN_KB];
     ssize_t rv = ::read(conn->fd, buf, sizeof(buf));
     if (rv <= 0) {
         conn->want_close = true;
         return;
     }
+
+    conn->last_read_ms = get_monotonic_msec();
+    dlist_detach(&conn->read_node);
+    dlist_insert_before(&data.read_list, &conn->read_node);
+    
     buf_append(conn->in, buf, static_cast<size_t>(rv));
-    while (handle_request(db, conn)) {};
+    while (handle_request(data.db, conn)) {};
     if (conn->out.data_begin != conn->out.data_end) {
         conn->want_read = false;
         conn->want_write = true;
-        return handle_write(conn);
+        return handle_write(data.write_list, conn);
     }
 }
 
@@ -130,6 +139,8 @@ void handle_destroy(Conn *c, std::vector<Conn *> &fd2conn) {
     (void)::close(c->fd); // c++ cast ?
     fd2conn[c->fd] = nullptr;
     dlist_detach(&c->idle_node);
+    dlist_detach(&c->read_node);
+    dlist_detach(&c->write_node);
     delete c;
 }
 
@@ -153,7 +164,7 @@ int run_server(g_data &data, const char* host, uint16_t port) {
             pfds.push_back(pfd);
         }
         
-        int32_t timeout_ms = next_timer_ms(data.idle_list);
+        int32_t timeout_ms = next_timer_ms(data.idle_list, data.read_list, data.write_list);
         int rv = ::poll(pfds.data(), (nfds_t)pfds.size(), timeout_ms);
         if (rv < 0) {
             if (errno == EINTR) continue;
@@ -177,11 +188,11 @@ int run_server(g_data &data, const char* host, uint16_t port) {
             dlist_detach(&c->idle_node);
             dlist_insert_before(&data.idle_list, &c->idle_node);
 
-            if (re & POLLIN) handle_read(data.db, c);
-            if (re & POLLOUT) handle_write(c);
+            if (re & POLLIN) handle_read(data, c);
+            if (re & POLLOUT) handle_write(data.write_list, c);
             if (re & POLLERR || c->want_close) handle_destroy(c, fd2conn);
         }
-        process_timers(data.idle_list, fd2conn);
+        process_timers(data.idle_list, data.read_list, data.write_list, fd2conn);
     } 
 
     return (0);

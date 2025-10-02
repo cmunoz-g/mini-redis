@@ -23,7 +23,10 @@ void buf_truncate(Buffer &b, size_t new_size) {
 
 /* Append & consume*/
 
+#include <cstdlib> // borrar
+
 void buf_append(Buffer &buf, const uint8_t *data, size_t len) {
+    static int i = 0;
     if (len == 0) return;
     assert(buf.buffer_begin <= buf.data_begin
         && buf.data_begin <= buf.data_end && buf.data_end <= buf.buffer_end);
@@ -42,6 +45,7 @@ void buf_append(Buffer &buf, const uint8_t *data, size_t len) {
     // could return a bool and the situation be managed in the caller ft.
     std::memcpy(buf.data_end, data, len);
     buf.data_end += len;
+    i++;
 }
 
 void buf_consume(Buffer &buf, size_t n) {

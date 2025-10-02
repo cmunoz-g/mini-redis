@@ -53,7 +53,6 @@ static bool handle_request(g_data &data, Conn *conn) {
     response_begin(conn->out, &header_pos);
     do_request(data, cmd, conn->out);
     response_end(conn->out, header_pos);
-
     return true;
 }
 
@@ -79,13 +78,13 @@ static void handle_write(DList &write_list, Conn *conn) {
     }
 }
 
-size_t strip_ctrl_chars(char *buf, size_t len) { // move over to utils.hh
-    while (len > 0) {
-        if (buf[len - 1] <= 0x1F || buf[len - 1] == 0x7F) len--;
-        else break;
-    }
-    return len;
-}
+// size_t strip_ctrl_chars(char *buf, size_t len) { // move over to utils.hh
+//     while (len > 0) {
+//         if (buf[len - 1] <= 0x1F || buf[len - 1] == 0x7F) len--;
+//         else break;
+//     }
+//     return len;
+// }
 
 static void handle_read(g_data &data, Conn *conn) { 
     uint8_t buf[BUFFER_SIZE_KB * BYTES_IN_KB];
@@ -99,10 +98,11 @@ static void handle_read(g_data &data, Conn *conn) {
     dlist_detach(&conn->read_node);
     dlist_insert_before(&data.read_list, &conn->read_node);
     
-    size_t bytes = strip_ctrl_chars(reinterpret_cast<char *>(buf), rv);
-    uint32_t prefix = static_cast<uint32_t>(bytes);
-    buf_append(conn->in, reinterpret_cast<uint8_t *>(&prefix), sizeof(uint32_t));
-    buf_append(conn->in, buf, bytes);
+    //size_t bytes = strip_ctrl_chars(reinterpret_cast<char *>(buf), rv);
+    //uint32_t prefix = static_cast<uint32_t>(bytes);
+    //buf_append(conn->in, reinterpret_cast<uint8_t *>(&prefix), sizeof(uint32_t));
+    //buf_append(conn->in, buf, bytes);
+    buf_append(conn->in, buf, static_cast<size_t>(rv));
 
     while (handle_request(data, conn)) {};
     if (conn->out.data_begin != conn->out.data_end) {

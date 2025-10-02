@@ -23,7 +23,7 @@ int32_t parse_request(const uint8_t *data, const size_t size, std::vector<std::s
     const uint8_t *end = data + size;
     uint32_t nstr = 0;
 
-    if (!read_u32(data, end, nstr)) return -1;
+    if (!read_u32(data, end, nstr)) return -1; 
     if (nstr > MAX_ARGS) return -1;
 
     while (out.size() < nstr) {
@@ -40,7 +40,8 @@ int32_t parse_request(const uint8_t *data, const size_t size, std::vector<std::s
 /* Response header */
 void response_begin(Buffer &out, size_t *header) {
     *header = out.data_end - out.data_begin;
-    buf_append(out, 0, sizeof(uint32_t));
+    uint32_t zero = 0;
+    buf_append(out, reinterpret_cast<uint8_t *>(&zero), sizeof(uint32_t));
 }
 
 static size_t response_size(Buffer &out, size_t header) {

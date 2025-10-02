@@ -27,5 +27,5 @@ struct LookupKey {
 
 bool entry_eq(HNode *lhs, HNode *rhs);
 Entry *entry_new(uint32_t type);
-void entry_del(std::vector<HeapItem> &heap, Entry *ent);
+void entry_del(g_data &data, Entry *ent);
 void entry_set_ttl(std::vector<HeapItem> &heap, Entry *ent, int64_t ttl_ms);

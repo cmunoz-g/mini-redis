@@ -4,6 +4,7 @@
 #include "protocol.hh"
 #include "dlist.hh"
 #include "heap.hh"
+#include "threadpool.hh"
 
 struct Conn { 
     int fd{-1};
@@ -17,6 +18,8 @@ struct g_data {
     HMap db;
     DList idle_list, write_list, read_list;
     std::vector<HeapItem> heap;
+    ThreadPool thread_pool;
+    bool close_server;
 };
 
 int run_server(g_data &data, const char* host, uint16_t port);

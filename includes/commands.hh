@@ -15,3 +15,4 @@ void do_zrem(g_data &data, std::vector<std::string> &cmd, Buffer &out);
 void do_zadd(g_data &data, std::vector<std::string> &cmd, Buffer &out);
 void do_zquery(g_data &data, std::vector<std::string> &cmd, Buffer &out);
 void do_expire(g_data &data, std::vector<std::string> &cmd, Buffer &out);
+void do_quit(g_data &data, std::vector<std::string> &cmd, Buffer &out);

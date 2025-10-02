@@ -79,7 +79,7 @@ static void process_key_timers(g_data &data, uint64_t now) {
     while (!data.heap.empty() && data.heap[0].val < now && nworks++ < k_max_key_works) {
         Entry *ent = container_of(data.heap[0].ref, Entry, heap_idx);
         hm_delete(&data.db, &ent->node, &hnode_same);
-        entry_del(data.heap, ent);
+        entry_del(data, ent);
     }
 }
 

@@ -1,8 +1,12 @@
 #include "entry.hh"
 #include "timer.hh"
+#include "threadpool.hh"
+#include "server.hh"
+#include "heap.hh"
 #include <utils.hh>
 #include <vector>
-#include "heap.hh"
+
+static constexpr size_t k_large_container_size = 1000;
 
 bool entry_eq(HNode *lhs, HNode *rhs) {
     struct Entry *le = container_of(lhs, struct Entry, node);
@@ -16,10 +20,23 @@ Entry *entry_new(uint32_t type) {
     return ent;
 }
 
-void entry_del(std::vector<HeapItem> &heap, Entry *ent) {
+static void entry_del_sync(Entry *ent) {
     if (ent->type == T_ZSET) zset_destroy(&ent->zset);
-    entry_set_ttl(heap, ent, -1);
     delete ent;
+}
+
+static void entry_del_f(void *arg) {
+    entry_del_sync(static_cast<Entry *>(arg));
+}
+
+void entry_del(g_data &data, Entry *ent) {
+    entry_set_ttl(data.heap, ent, -1);
+    size_t set_size = ent->type == T_ZSET ? hm_size(&ent->zset.hmap) : 0;
+    
+    if (set_size > k_large_container_size)
+        thread_pool_queue(&data.thread_pool, &entry_del_f, ent);
+    else
+        entry_del_sync(ent);
 }
 
 void entry_set_ttl(std::vector<HeapItem> &heap, Entry *ent, int64_t ttl_ms) {

@@ -48,7 +48,7 @@ void do_del(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
     key.node.hcode = hash(reinterpret_cast<uint8_t *>(key.key.data()), key.key.size());
     HNode *node = hm_lookup(&data.db, &key.node, &entry_eq);
 
-    if (node) entry_del(data.heap, container_of(node, Entry, node));
+    if (node) entry_del(data, container_of(node, Entry, node));
 
     return out_int(out, node ? 1 : 0);
 }
@@ -187,4 +187,10 @@ void do_expire(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
     }
     
     return out_int(out, node ? 1 : 0);
+}
+
+void do_quit(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
+    data.close_server = true;
+    const std::string bye_msg = "closing mini-redis server";
+    return out_str(out, bye_msg.data(), bye_msg.size());
 }

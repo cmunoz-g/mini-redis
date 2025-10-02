@@ -2,6 +2,8 @@
 #include "socket.hh"
 #include "commands.hh"
 #include "timer.hh"
+#include "entry.hh"
+#include "utils.hh"
 #include <poll.h>
 #include <cstring>
 #include <assert.h>
@@ -30,6 +32,8 @@ static const std::unordered_map<std::string, Command> command_list {
     {"zscore", {3, do_zscore}},
     {"zquery", {6, do_zquery}},
     {"expire", {3, do_expire}},
+    {"quit", {1, do_quit}},
+    {"exit", {1, do_quit}}
 };
 
 static void do_request(g_data &data, std::vector<std::string> &cmd, Buffer &out) { // make this bool ?
@@ -142,7 +146,31 @@ void handle_destroy(Conn *c, std::vector<Conn *> &fd2conn) {
     dlist_detach(&c->idle_node);
     dlist_detach(&c->read_node);
     dlist_detach(&c->write_node);
+    // Check Conn creation, i'm doing new for both in,out Buffers. Dangling ?
     delete c;
+}
+
+// struct g_data {
+//     HMap db;
+//     DList idle_list, write_list, read_list;
+//     std::vector<HeapItem> heap;
+//     ThreadPool thread_pool;
+//     bool close_server;
+// };
+
+static bool delete_all_entries(HNode *node, void *arg) {
+    g_data *data = static_cast<g_data *>(arg);
+    Entry *ent = container_of(node, Entry, node);
+    entry_del(*data, ent);
+    return true;
+}
+
+static int close_server(g_data &data, std::vector<Conn *> fd2conn) { // can this, or delete_all_entries fail at any point ?
+    for (Conn *c : fd2conn) handle_destroy(c, fd2conn);
+    hm_foreach(&data.db, &delete_all_entries, &data);
+    hm_destroy(&data.db);
+    thread_pool_destroy(&data.thread_pool);
+    return true;
 }
 
 int run_server(g_data &data, const char* host, uint16_t port) {
@@ -194,6 +222,7 @@ int run_server(g_data &data, const char* host, uint16_t port) {
             if (re & POLLERR || c->want_close) handle_destroy(c, fd2conn);
         }
         process_timers(data.idle_list, data.read_list, data.write_list, fd2conn);
+        if (data.close_server) return close_server(data, fd2conn);
     } 
 
     return (0);

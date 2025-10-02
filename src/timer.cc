@@ -6,9 +6,9 @@
 #include <poll.h>
 #include <time.h>
 
-static constexpr uint64_t k_idle_timeout_ms = 5000;
-static constexpr uint64_t k_read_timeout_ms = 2000;
-static constexpr uint64_t k_write_timeout_ms = 3000;
+static constexpr uint64_t k_idle_timeout_ms = 60000;
+static constexpr uint64_t k_read_timeout_ms = 15000;
+static constexpr uint64_t k_write_timeout_ms = 15000;
 static constexpr size_t k_max_key_works = 2000;
 
 uint64_t get_monotonic_msec() {
@@ -28,7 +28,6 @@ int32_t next_timer_ms(g_data &data) {
     Conn *c_read = container_of(data.read_list.next, Conn, read_node);
     Conn *c_write = container_of(data.write_list.next, Conn, write_node);
 
-        // what happens if there is c_idle but no c_read and/or c_write ? segfault ? can that happen ?
     uint64_t next_ms = std::min({c_write->last_active_ms + k_write_timeout_ms,  // min, ::min or std::min ? whats cleaner
         c_read->last_read_ms + k_read_timeout_ms,
         c_idle->last_write_ms + k_idle_timeout_ms});

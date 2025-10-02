@@ -1,6 +1,7 @@
 #include "buffer.hh"
 #include <cstring>
 #include <cassert>
+#include <cstdio> // quitar
 
 /* Utils */
 

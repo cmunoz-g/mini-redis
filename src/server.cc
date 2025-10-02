@@ -30,15 +30,19 @@ static void do_request(g_data &data, std::vector<std::string> &cmd, Buffer &out)
 
 static bool handle_request(g_data &data, Conn *conn) {
     size_t size = conn->in.data_end - conn->in.data_begin;
+    printf("size : %zu\n", size);
     if (size < 4) return false;
 
     uint32_t len = 0;
     memcpy(&len, conn->in.data_begin, 4);
+
+    printf("len : %d\n", (int)len);
     if (len > MSG_SIZE_LIMIT) {
         conn->want_close = true;
+        printf("here!\n");
+        exit(1);
         return false;
     }
-
     if (4 + len > size) return false;
 
     const uint8_t *request = conn->in.data_begin + 4;
@@ -79,6 +83,14 @@ static void handle_write(DList &write_list, Conn *conn) {
     }
 }
 
+size_t strip_ctrl_chars(char *buf, size_t len) { // move over to utils.hh
+    while (len > 0) {
+        if (buf[len - 1] <= 0x1F || buf[len - 1] == 0x7F) len--;
+        else break;
+    }
+    return len;
+}
+
 static void handle_read(g_data &data, Conn *conn) {
     uint8_t buf[BUFFER_SIZE_KB * BYTES_IN_KB];
     ssize_t rv = ::read(conn->fd, buf, sizeof(buf));
@@ -91,7 +103,10 @@ static void handle_read(g_data &data, Conn *conn) {
     dlist_detach(&conn->read_node);
     dlist_insert_before(&data.read_list, &conn->read_node);
     
-    buf_append(conn->in, buf, static_cast<size_t>(rv));
+    // ft to take out weird chars
+    size_t bytes = strip_ctrl_chars(reinterpret_cast<char *>(buf), rv);
+    buf_append(conn->in, buf, bytes);
+
     while (handle_request(data, conn)) {};
     if (conn->out.data_begin != conn->out.data_end) {
         conn->want_read = false;
@@ -100,15 +115,20 @@ static void handle_read(g_data &data, Conn *conn) {
     }
 }
 
-static Conn *handle_accept(int fd) { 
+static Conn *handle_accept(g_data &data, int fd) { 
     struct sockaddr_in client_addr = {};
     socklen_t addrlen = sizeof(client_addr);
     int connfd = ::accept(fd, reinterpret_cast<sockaddr *>(&client_addr), &addrlen);
     if (connfd < 0) return nullptr;
     if (set_non_blocking(connfd)) (void)0; // handle error
+    
     Conn *conn = new Conn();
     conn->fd = connfd;
     conn->want_read = true;
+    conn->last_active_ms = conn->last_read_ms = conn->last_write_ms = get_monotonic_msec();
+    dlist_insert_before(&data.idle_list, &conn->idle_node);
+    dlist_insert_before(&data.read_list, &conn->read_node);
+    dlist_insert_before(&data.write_list, &conn->write_node);
 
     constexpr size_t buffer_size = BUFFER_SIZE_KB * BYTES_IN_KB;
     uint8_t *inbuf = new uint8_t[buffer_size];
@@ -164,7 +184,6 @@ int run_server(g_data &data, const char* host, uint16_t port) {
         pfds.clear();
         pfds.push_back(pollfd{server_fd, POLLIN, 0});
 
-        // this for loop is crashing
         for (int fd = 0; fd < static_cast<int>(fd2conn.size()); ++fd) {
             Conn *c = fd2conn[fd];
             if (!c) continue;
@@ -182,7 +201,7 @@ int run_server(g_data &data, const char* host, uint16_t port) {
         }
 
         if (pfds[0].revents & POLLIN) { // revents in the server_fd aka new connections
-            if (Conn *c = handle_accept(server_fd)) {
+            if (Conn *c = handle_accept(data, server_fd)) {
                 if (fd2conn.size() <= (size_t)c->fd) fd2conn.resize(c->fd + 1);
                 fd2conn[c->fd] = c;
             }
@@ -193,7 +212,7 @@ int run_server(g_data &data, const char* host, uint16_t port) {
             if (re == 0) continue;
 
             Conn *c = fd2conn[pfds[i].fd];
-
+            
             c->last_active_ms = get_monotonic_msec();
             dlist_detach(&c->idle_node);
             dlist_insert_before(&data.idle_list, &c->idle_node);

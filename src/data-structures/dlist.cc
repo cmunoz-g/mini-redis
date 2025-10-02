@@ -1,5 +1,8 @@
 #include "dlist.hh"
 
+#include <stdio.h>
+#include <stdlib.h>
+
 void dlist_detach(DList *node) {
     DList *prev = node->prev;
     DList *next = node->next;

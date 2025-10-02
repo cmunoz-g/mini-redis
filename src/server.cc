@@ -30,17 +30,13 @@ static void do_request(g_data &data, std::vector<std::string> &cmd, Buffer &out)
 
 static bool handle_request(g_data &data, Conn *conn) {
     size_t size = conn->in.data_end - conn->in.data_begin;
-    printf("size : %zu\n", size);
     if (size < 4) return false;
 
     uint32_t len = 0;
     memcpy(&len, conn->in.data_begin, 4);
 
-    printf("len : %d\n", (int)len);
     if (len > MSG_SIZE_LIMIT) {
         conn->want_close = true;
-        printf("here!\n");
-        exit(1);
         return false;
     }
     if (4 + len > size) return false;
@@ -91,7 +87,7 @@ size_t strip_ctrl_chars(char *buf, size_t len) { // move over to utils.hh
     return len;
 }
 
-static void handle_read(g_data &data, Conn *conn) {
+static void handle_read(g_data &data, Conn *conn) { 
     uint8_t buf[BUFFER_SIZE_KB * BYTES_IN_KB];
     ssize_t rv = ::read(conn->fd, buf, sizeof(buf));
     if (rv <= 0) {
@@ -103,8 +99,9 @@ static void handle_read(g_data &data, Conn *conn) {
     dlist_detach(&conn->read_node);
     dlist_insert_before(&data.read_list, &conn->read_node);
     
-    // ft to take out weird chars
     size_t bytes = strip_ctrl_chars(reinterpret_cast<char *>(buf), rv);
+    uint32_t prefix = static_cast<uint32_t>(bytes);
+    buf_append(conn->in, reinterpret_cast<uint8_t *>(&prefix), sizeof(uint32_t));
     buf_append(conn->in, buf, bytes);
 
     while (handle_request(data, conn)) {};

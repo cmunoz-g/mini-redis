@@ -1,4 +1,6 @@
 #pragma once
+#include <cstdint>
+#include <vector>
 
 struct HeapItem {
     uint64_t val;

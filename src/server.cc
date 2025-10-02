@@ -1,7 +1,7 @@
 #include "server.hh"
+#include "timer.hh"
 #include "socket.hh"
 #include "commands.hh"
-#include "timer.hh"
 #include "entry.hh"
 #include "utils.hh"
 #include <poll.h>
@@ -15,27 +15,6 @@ static constexpr size_t BUFFER_SIZE_KB = 64;
 static constexpr size_t BYTES_IN_KB = 1024;
 // Move Command and command_list elsewhere ?
 
-using Handler = void(*)(g_data &, std::vector<std::string> &, Buffer &);
-
-struct Command {
-    size_t arity;
-    Handler f;
-};
-
-static const std::unordered_map<std::string, Command> command_list {
-    {"get", {2, do_get}},
-    {"set", {3, do_set}},
-    {"del", {2, do_del}},
-    {"keys", {1, do_keys}},
-    {"zadd", {4, do_zadd}},
-    {"zrem", {3, do_zrem}},
-    {"zscore", {3, do_zscore}},
-    {"zquery", {6, do_zquery}},
-    {"expire", {3, do_expire}},
-    {"quit", {1, do_quit}},
-    {"exit", {1, do_quit}}
-};
-
 static void do_request(g_data &data, std::vector<std::string> &cmd, Buffer &out) { // make this bool ?
     if (cmd.empty()) return out_err(out, ERR_EMPTY, "empty command");
 
@@ -45,7 +24,8 @@ static void do_request(g_data &data, std::vector<std::string> &cmd, Buffer &out)
     const Command c = it->second;
     if (cmd.size() != c.arity) return out_err(out, ERR_BAD_ARG, "wrong number of arguments");
     
-    return c.f(data, cmd, out);
+    Request req{data, cmd, out};
+    return c.f(req);
 }
 
 static bool handle_request(g_data &data, Conn *conn) {
@@ -193,7 +173,7 @@ int run_server(g_data &data, const char* host, uint16_t port) {
             pfds.push_back(pfd);
         }
         
-        int32_t timeout_ms = next_timer_ms(data.idle_list, data.read_list, data.write_list);
+        int32_t timeout_ms = next_timer_ms(data);
         int rv = ::poll(pfds.data(), (nfds_t)pfds.size(), timeout_ms);
         if (rv < 0) {
             if (errno == EINTR) continue;
@@ -221,7 +201,7 @@ int run_server(g_data &data, const char* host, uint16_t port) {
             if (re & POLLOUT) handle_write(data.write_list, c);
             if (re & POLLERR || c->want_close) handle_destroy(c, fd2conn);
         }
-        process_timers(data.idle_list, data.read_list, data.write_list, fd2conn);
+        process_timers(data, fd2conn);
         if (data.close_server) return close_server(data, fd2conn);
     } 
 

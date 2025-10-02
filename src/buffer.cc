@@ -4,17 +4,17 @@
 
 /* Utils */
 
-inline size_t buf_size(const Buffer &b) {
+size_t buf_size(const Buffer &b) {
     return static_cast<size_t>(b.data_end - b.data_begin);
 }
 
-inline uint8_t *buf_at(Buffer &b, size_t off) {
+uint8_t *buf_at(Buffer &b, size_t off) {
     size_t used = buf_size(b);
     if (off > used) return nullptr;
     return b.data_begin + off;
 }
 
-inline void buf_truncate(Buffer &b, size_t new_size) {
+void buf_truncate(Buffer &b, size_t new_size) {
     size_t used = buf_size(b);
     if (new_size > used) return;
     b.data_end = b.data_begin + new_size;

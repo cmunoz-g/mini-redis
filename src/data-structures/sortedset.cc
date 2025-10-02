@@ -1,5 +1,4 @@
 #include "sortedset.hh"
-#include "hashtable.hh"
 #include "utils.hh"
 #include <cstdlib>
 #include <cstring>
@@ -126,8 +125,8 @@ ZNode *znode_offset(ZNode *node, int64_t offset) {
 }
 
 static void tree_destroy(AVLNode *node) {
-    tree_destroy(node->l);
-    tree_destroy(node->r);
+    if (node->l) tree_destroy(node->l);
+    if (node->r) tree_destroy(node->r);
     znode_del(container_of(node, ZNode, tree));
 }
 

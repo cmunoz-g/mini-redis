@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include "server.hh"
 #include "sortedset.hh"
 #include "hashtable.hh"
 

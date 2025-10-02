@@ -1,13 +1,10 @@
 #include "timer.hh"
 #include "dlist.hh"
-#include "server.hh"
 #include "utils.hh"
 #include "entry.hh"
+#include <algorithm>
 #include <poll.h>
 #include <time.h>
-
-// Before : Exercise: Add IO timeouts for read() and write() (with a different timeout value).
-// Make sure all the ttl, timer stuff is completely clear
 
 static constexpr uint64_t k_idle_timeout_ms = 5000;
 static constexpr uint64_t k_read_timeout_ms = 2000;
@@ -31,9 +28,9 @@ int32_t next_timer_ms(g_data &data) {
     Conn *c_read = container_of(data.read_list.next, Conn, read_node);
     Conn *c_write = container_of(data.write_list.next, Conn, write_node);
 
-    uint64_t next_ms = std::min(c_write->last_active_ms + k_write_timeout_ms, 
+    uint64_t next_ms = std::min({c_write->last_active_ms + k_write_timeout_ms,  // min, ::min or std::min ? whats cleaner
         c_read->last_read_ms + k_read_timeout_ms,
-        c_idle->last_write_ms + k_idle_timeout_ms);
+        c_idle->last_write_ms + k_idle_timeout_ms});
     
     if (!data.heap.empty() && data.heap[0].val < next_ms)
         next_ms = data.heap[0].val;

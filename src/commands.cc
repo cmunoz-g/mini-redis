@@ -1,13 +1,19 @@
-#include "commands.hh"
 #include "server.hh"
+#include "protocol.hh"
+#include "commands.hh"
 #include "entry.hh"
 #include "utils.hh"
 #include "hashtable.hh"
 #include "sortedset.hh"
 #include <cassert>
 #include <cmath>
+#include <unordered_map>
 
-void do_get(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
+void do_get(Request &req) {
+    g_data &data = req.data;
+    std::vector<std::string> &cmd = req.cmd;
+    Buffer &out = req.out;
+
     LookupKey key;
     key.key.swap(cmd[1]);
     key.node.hcode = hash(reinterpret_cast<uint8_t *>(key.key.data()), key.key.size());
@@ -21,7 +27,11 @@ void do_get(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
     return out_str(out, ent->str.data(), ent->str.size());
 }
 
-void do_set(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
+void do_set(Request &req) {
+    g_data &data = req.data;
+    std::vector<std::string> &cmd = req.cmd;
+    Buffer &out = req.out;
+
     LookupKey key;
     key.key.swap(cmd[1]);
     key.node.hcode = hash(reinterpret_cast<uint8_t *>(key.key.data()), key.key.size());
@@ -42,7 +52,11 @@ void do_set(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
     return out_nil(out);
 }
 
-void do_del(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
+void do_del(Request &req) {
+    g_data &data = req.data;
+    std::vector<std::string> &cmd = req.cmd;
+    Buffer &out = req.out;
+
     LookupKey key;
     key.key.swap(cmd[2]);
     key.node.hcode = hash(reinterpret_cast<uint8_t *>(key.key.data()), key.key.size());
@@ -53,16 +67,16 @@ void do_del(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
     return out_int(out, node ? 1 : 0);
 }
 
-static bool cb_keys(HNode *node, void *arg) {
+static bool cb_keys(HNode *node, void *arg) { // can this fail ? should return false in any case ? if not, could hm/h_foreach be void ? check also the entry_del_all in server shutdown
     Buffer &out = *(static_cast<Buffer *>(arg));
     const std::string &key = container_of(node, Entry, node)->key;
     out_str(out, key.data(), key.size());
-    //return true;
+    return true;
 }
 
-void do_keys(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
-    // is it correct for this ft to receive &cmd even though it doesnt use them ? Only doing it so the compiler doesnt complain in command_list
-    // would be either this or changing up do_request()
+void do_keys(Request &req) {
+    g_data &data = req.data;
+    Buffer &out = req.out;
     out_arr(out, static_cast<uint32_t>(hm_size(&data.db)));
     hm_foreach(&data.db, &cb_keys, (void *)&out);
 }
@@ -96,7 +110,11 @@ static bool str_to_int(const std::string s, int64_t &i) {
 }
 
 // missing: a reversed verseion that does seek and iterate in descending order
-void do_zquery(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
+void do_zquery(Request &req) {
+    g_data &data = req.data;
+    std::vector<std::string> &cmd = req.cmd;
+    Buffer &out = req.out;
+
     ZSet *zset = expect_zset(data.db, cmd[1]);
     if (!zset) return out_err(out, ERR_BAD_TYPE, "expect zset");
 
@@ -125,7 +143,11 @@ void do_zquery(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
 }
 
 // zadd zset score name
-void do_zadd(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
+void do_zadd(Request &req) {
+    g_data &data = req.data;
+    std::vector<std::string> &cmd = req.cmd;
+    Buffer &out = req.out;
+
     double score = 0;
     if (!str_to_double(cmd[2], score)) out_err(out, ERR_BAD_ARG, "expected fp number");
 
@@ -153,7 +175,11 @@ void do_zadd(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
     return out_int(out, static_cast<int64_t>(added));
 }
 
-void do_zrem(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
+void do_zrem(Request &req) {
+    g_data &data = req.data;
+    std::vector<std::string> &cmd = req.cmd;
+    Buffer &out = req.out;
+
     ZSet *zset = expect_zset(data.db, cmd[1]);
     if (!zset) out_err(out, ERR_BAD_TYPE, "expected zset");
 
@@ -163,7 +189,11 @@ void do_zrem(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
     return out_int(out, znode ? 1 : 0);
 }
 
-void do_zscore(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
+void do_zscore(Request &req) {
+    g_data &data = req.data;
+    std::vector<std::string> &cmd = req.cmd;
+    Buffer &out = req.out;
+
     ZSet *zset = expect_zset(data.db, cmd[1]);
     if (!zset) out_err(out, ERR_BAD_TYPE, "expected zset");
     
@@ -172,7 +202,11 @@ void do_zscore(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
     return znode ? out_dbl(out, znode->score) : out_nil(out);
 }
 
-void do_expire(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
+void do_expire(Request &req) {
+    g_data &data = req.data;
+    std::vector<std::string> &cmd = req.cmd;
+    Buffer &out = req.out;
+
     int64_t ttl_ms = 0;
     if (!str_to_int(cmd[2], ttl_ms)) return out_err(out, ERR_BAD_TYPE, "expected int");
 
@@ -189,7 +223,10 @@ void do_expire(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
     return out_int(out, node ? 1 : 0);
 }
 
-void do_quit(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
+void do_quit(Request &req) {
+    g_data &data = req.data;
+    Buffer &out = req.out;
+
     data.close_server = true;
     const std::string bye_msg = "closing mini-redis server";
     return out_str(out, bye_msg.data(), bye_msg.size());

@@ -22,15 +22,15 @@ static void avl_update(AVLNode *node) {
     node->count = 1 + avl_count(node->l) + avl_count(node->r);
 }
 
-static uint8_t avl_get_height_diff(AVLNode *node) {
-    uintptr_t p = reinterpret_cast<uintptr_t>(node->parent);
-    return p & 0b11;
-}
+// static uint8_t avl_get_height_diff(AVLNode *node) {
+//     uintptr_t p = reinterpret_cast<uintptr_t>(node->parent);
+//     return p & 0b11;
+// }
 
-static AVLNode *avl_get_parent(AVLNode *node) {
-    uintptr_t p = reinterpret_cast<uintptr_t>(node->parent);
-    return reinterpret_cast<AVLNode *>(p & (~0b11));
-}
+// static AVLNode *avl_get_parent(AVLNode *node) {
+//     uintptr_t p = reinterpret_cast<uintptr_t>(node->parent);
+//     return reinterpret_cast<AVLNode *>(p & (~0b11));
+// }
 
 static AVLNode *rot_left(AVLNode *node) {
     AVLNode *parent = node->parent;

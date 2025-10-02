@@ -1,5 +1,5 @@
 NAME = mini-redis
-CXX = gcc
+CXX = g++
 CXXFLAGS = -Wall -Werror -Wextra
 FOLDER = src/
 OBJ_FOLDER = obj/

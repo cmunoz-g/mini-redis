@@ -1,5 +1,5 @@
 #pragma once
-
+#include "hashtable.hh"
 #include "avltree.hh"
 
 struct ZSet {

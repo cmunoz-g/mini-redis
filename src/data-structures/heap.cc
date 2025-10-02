@@ -1,7 +1,6 @@
 #include "heap.hh"
 #include "entry.hh"
 #include <cstddef>
-#include <cstdint>
 #include <algorithm>
 #include <vector>
 

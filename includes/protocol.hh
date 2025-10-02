@@ -4,8 +4,8 @@
 #include <vector>
 #include <string>
 
-inline constexpr size_t MSG_SIZE_LIMIT = 4096; 
-inline constexpr size_t MAX_ARGS = 32u << 20;
+constexpr size_t MSG_SIZE_LIMIT = 4096; 
+constexpr size_t MAX_ARGS = 32u << 20;
 
 enum {
     RES_OK = 0,
@@ -39,7 +39,7 @@ void out_nil(Buffer &out);
 void out_str(Buffer &out, const char *s, size_t size);
 void out_int(Buffer &out, int64_t val);
 void out_arr(Buffer &out, uint32_t n);
-void out_err(Buffer &out, uint32_t code, const char *msg);
+void out_err(Buffer &out, uint32_t code, const std::string &msg);
 void out_dbl(Buffer &out, double val);
 size_t out_begin_arr(Buffer &out);
 void out_end_arr(Buffer &out, size_t ctx, uint32_t n);

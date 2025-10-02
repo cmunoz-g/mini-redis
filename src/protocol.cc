@@ -71,7 +71,7 @@ void out_str(Buffer &out, const char *s, size_t size) {
     uint8_t tag = TAG_STR;
     buf_append(out, &tag, sizeof(tag));
 
-    if (size > std::numeric_limits<uint32_t>::max()) return ; // error handling todo
+    if (size > std::numeric_limits<uint32_t>::max()) return out_err(out, ERR_TOO_BIG, "string len too big");
     uint32_t len = static_cast<uint32_t>(size);
     uint32_t be = htobe32(len);
 
@@ -84,7 +84,7 @@ void out_int(Buffer &out, int64_t val) {
     buf_append(out, &tag, sizeof(tag));
 
     uint64_t u = static_cast<uint64_t>(val);
-    int64_t be = htobe64(val);
+    int64_t be = htobe64(u);
 
     buf_append(out, reinterpret_cast<uint8_t *>(&be), sizeof(be));
 }
@@ -105,12 +105,11 @@ void out_err(Buffer &out, uint32_t code, const std::string &msg) {
     uint32_t code_be = htobe32(code);
     buf_append(out, reinterpret_cast<uint8_t *>(&code_be), sizeof(code_be));
 
-    size_t size = msg.size();
-    if (size > std::numeric_limits<uint32_t>::max()) return ; // error handling todo
-    uint32_t len = static_cast<uint32_t>(size);
+    uint32_t len = static_cast<uint32_t>(msg.size());
     uint32_t size_be = htobe32(len);
 
-    buf_append(out, reinterpret_cast<const uint8_t *>(&msg), size);
+    buf_append(out, reinterpret_cast<uint8_t *>(&size_be), sizeof(size_be));
+    buf_append(out, reinterpret_cast<const uint8_t *>(&msg), msg.size());
 }
 
 void out_dbl(Buffer &out, double val) { // assumes IEEE-754 and BE

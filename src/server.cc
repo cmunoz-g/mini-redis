@@ -164,7 +164,8 @@ int run_server(g_data &data, const char* host, uint16_t port) {
         pfds.clear();
         pfds.push_back(pollfd{server_fd, POLLIN, 0});
 
-        for (int fd = 0; fd < (int)pfds.size(); ++fd) {
+        // this for loop is crashing
+        for (int fd = 0; fd < static_cast<int>(fd2conn.size()); ++fd) {
             Conn *c = fd2conn[fd];
             if (!c) continue;
             struct pollfd pfd = {c->fd, POLLERR, 0};
@@ -172,7 +173,7 @@ int run_server(g_data &data, const char* host, uint16_t port) {
             if (c->want_write) pfd.events |= POLLOUT;
             pfds.push_back(pfd);
         }
-        
+
         int32_t timeout_ms = next_timer_ms(data);
         int rv = ::poll(pfds.data(), (nfds_t)pfds.size(), timeout_ms);
         if (rv < 0) {

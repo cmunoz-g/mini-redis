@@ -16,11 +16,11 @@ static constexpr size_t BYTES_IN_KB = 1024;
 // Move Command and command_list elsewhere ?
 
 static void do_request(g_data &data, std::vector<std::string> &cmd, Buffer &out) { // make this bool ?
+    printf("Checkpoint 2\n");
     if (cmd.empty()) return out_err(out, ERR_EMPTY, "empty command");
 
     auto it = command_list.find(cmd[0]);
     if (it == command_list.end()) return out_err(out, ERR_UNKNOWN, "unknown command");
-
     const Command c = it->second;
     if (cmd.size() != c.arity) return out_err(out, ERR_BAD_ARG, "wrong number of arguments");
     
@@ -53,7 +53,17 @@ static bool handle_request(g_data &data, Conn *conn) {
     response_begin(conn->out, &header_pos);
     do_request(data, cmd, conn->out);
     response_end(conn->out, header_pos);
-    return true;
+    printf("Checkpoint 3, there should be : 6 calls to buf_append\n");
+    // (testing with wrong cmds)
+    // up until this point : 6 calls to buf_append are done and do_request returns succesfully.
+    // afterwards since this returns true, the loop continues (looks like forever)
+    // and it gets to a point where buf memory is corrupted (i believe. after 8k calls to buf_append
+    // one of the invariatns (data.end <= buffer.end) is broken)
+    // need to check : 
+    // is the loop while (handle_request(data, conn)) {}; correct ?
+    // we are not consuming from the buffer so its never ending. what was the original point of the loop
+    // and is it needed now ?
+    return true; 
 }
 
 static void handle_write(DList &write_list, Conn *conn) {
@@ -87,6 +97,7 @@ static void handle_write(DList &write_list, Conn *conn) {
 // }
 
 static void handle_read(g_data &data, Conn *conn) { 
+    printf("Checkpoint 1\n");
     uint8_t buf[BUFFER_SIZE_KB * BYTES_IN_KB];
     ssize_t rv = ::read(conn->fd, buf, sizeof(buf));
     if (rv <= 0) {
@@ -98,13 +109,10 @@ static void handle_read(g_data &data, Conn *conn) {
     dlist_detach(&conn->read_node);
     dlist_insert_before(&data.read_list, &conn->read_node);
     
-    //size_t bytes = strip_ctrl_chars(reinterpret_cast<char *>(buf), rv);
-    //uint32_t prefix = static_cast<uint32_t>(bytes);
-    //buf_append(conn->in, reinterpret_cast<uint8_t *>(&prefix), sizeof(uint32_t));
-    //buf_append(conn->in, buf, bytes);
     buf_append(conn->in, buf, static_cast<size_t>(rv));
 
     while (handle_request(data, conn)) {};
+    printf("Checkpoint 4\n");
     if (conn->out.data_begin != conn->out.data_end) {
         conn->want_read = false;
         conn->want_write = true;

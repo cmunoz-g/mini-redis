@@ -48,10 +48,10 @@ static std::vector<std::string> split(std::string s) {
 }
 
 static int32_t handle_write(int fd, const char *buf, size_t n) {
+    
     while (n > 0) {
         ssize_t rv = ::write(fd, buf, n);
         if (rv <= 0) return -1;
-        assert(static_cast<size_t>(rv) <= n);
         n -= static_cast<size_t>(rv);
         buf += rv;
     }
@@ -62,7 +62,6 @@ static int32_t handle_read(int fd, char *buf, size_t n) {
     while (n > 0) {
         ssize_t rv = ::read(fd, buf, n);
         if (rv <= 0) return -1;
-        assert(static_cast<size_t>(rv) <= n);
         n -= rv;
         buf += rv;
     }
@@ -179,6 +178,7 @@ static int32_t send_req(int fd, std::vector<std::string> &cmd) {
         memcpy(&wbuf[cur], s.data(), s.size()); // [cmd/arg content]
         cur += s.size();
     }
+
     return handle_write(fd, wbuf, len + 4); // len + 4 len represents [size of total payload] but doesnt include the 4 bytes of itself
 }
 
@@ -189,15 +189,16 @@ int run_client(uint16_t port) {
     for (;;) {
         printf("> ");
         std::string line;
-        if (!std::getline(std::cin, line)) {
-            void(0); // error . what to do ?
-        }
-        std::vector<std::string> cmd = split(line); // test empty input
+        if (!std::getline(std::cin, line)) void(0); // error . what to do ?
+
+        std::vector<std::string> cmd = split(line);
+        if (cmd.empty()) continue;
         if (send_req(fd, cmd)) void(0); // errmgmt problem: could return non-zero if msg is larger than max size(non fatal) or if write fails in handle_write(fatal)
         if (cmd[0] == "exit" || cmd[0] == "quit") {
             ::close(fd);
             return 0;
         }
         if (read_res(fd)) void(0); // same thing
+    
     }
 }

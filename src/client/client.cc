@@ -59,11 +59,24 @@ static int32_t handle_write(int fd, const char *buf, size_t n) {
 }
 
 static int32_t handle_read(int fd, char *buf, size_t n) {
+    static int i = 0;
+    size_t len = n;
+    if (i) fprintf(stderr, "n : %zu\n", n);
     while (n > 0) {
         ssize_t rv = ::read(fd, buf, n);
+        if (i) fprintf(stderr, "bytes read : %zu\n", rv);
         if (rv <= 0) return -1;
         n -= rv;
         buf += rv;
+    }
+
+    if (i == 0) {
+        i++;
+        fprintf(stderr, "%zu\n", len);
+    }
+    else {
+        fprintf(stderr, "bye\n");
+        exit(0);
     }
     return 0;
 }
@@ -141,11 +154,16 @@ static int32_t read_res(int fd) {
         return err;
     }
 
-    uint32_t len = 0;
-    memcpy(&len, rbuf, sizeof(uint32_t));
+    uint32_t len_be = 0;
+    memcpy(&len_be, rbuf, sizeof(uint32_t));
+    uint32_t len = ntohl(len_be);
+
     if (len > MSG_SIZE_LIMIT) return -1; // print err msg : msg too long . should stop client ?
 
+    fprintf(stderr, "len : %d\n", len);
+    fprintf(stderr, "Checkpoint 1\n");
     err = handle_read(fd, &rbuf[4], len);
+    fprintf(stderr, "Checkpoint 2\n");
     if (err) {
         // read() error, msg
         return err;

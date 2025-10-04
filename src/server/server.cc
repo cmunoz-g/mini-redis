@@ -13,14 +13,16 @@
 
 static constexpr size_t BUFFER_SIZE_KB = 64;
 static constexpr size_t BYTES_IN_KB = 1024;
-// Move Command and command_list elsewhere ?
 
 static void do_request(g_data &data, std::vector<std::string> &cmd, Buffer &out) { // make this bool ?
-    printf("Checkpoint 2\n");
-    if (cmd.empty()) return out_err(out, ERR_EMPTY, "empty command");
+    //printf("Checkpoint 2\n");
+    if (cmd.empty()) return out_err(out, ERR_EMPTY, "empty command"); // controlled for in client.cpp i thiink its not necessary
+
+    //for (auto s : cmd) printf("%s\n", s.c_str());
 
     auto it = command_list.find(cmd[0]);
     if (it == command_list.end()) return out_err(out, ERR_UNKNOWN, "unknown command");
+
     const Command c = it->second;
     if (cmd.size() != c.arity) return out_err(out, ERR_BAD_ARG, "wrong number of arguments");
     
@@ -53,24 +55,31 @@ static bool handle_request(g_data &data, Conn *conn) {
     response_begin(conn->out, &header_pos);
     do_request(data, cmd, conn->out);
     response_end(conn->out, header_pos);
-    printf("Checkpoint 3, there should be : 6 calls to buf_append\n");
-    // (testing with wrong cmds)
-    // up until this point : 6 calls to buf_append are done and do_request returns succesfully.
-    // afterwards since this returns true, the loop continues (looks like forever)
-    // and it gets to a point where buf memory is corrupted (i believe. after 8k calls to buf_append
-    // one of the invariatns (data.end <= buffer.end) is broken)
-    // need to check : 
-    // is the loop while (handle_request(data, conn)) {}; correct ?
-    // we are not consuming from the buffer so its never ending. what was the original point of the loop
-    // and is it needed now ?
+
+    buf_consume(conn->in, sizeof(uint32_t) + len);
+    //printf("Checkpoint 3, there should be : 6 calls to buf_append\n");
+
     return true; 
 }
 
 static void handle_write(DList &write_list, Conn *conn) {
-    size_t size = conn->out.data_end - conn->out.data_begin;
+    size_t size = buf_size(conn->out);
 
     assert(size > 0);
     ssize_t rv = ::write(conn->fd, conn->out.data_begin, size);
+
+    // current status of the problem:
+    // testing with an uknown cmd, server should send 32 bytes, but here is just sending 28
+    // in the client side, the header (first 4 bytes) is correctly read as 32 bytes, but 
+    // since the server only sends 28, it hangs forever.
+    // server correctly sets the total payload size including the header
+    // now gotta figure out why is it not sending those 4 bytes ? (i assume they are bytes 29-32)
+    
+    printf("write(): tried %zu, wrote %zu\n", size, rv);
+    if ((size_t)rv < size) {
+        printf("partial write\n");
+    }
+
     if (rv < 0) {
         if (errno == EAGAIN) return;
         conn->want_close = true;
@@ -97,7 +106,7 @@ static void handle_write(DList &write_list, Conn *conn) {
 // }
 
 static void handle_read(g_data &data, Conn *conn) { 
-    printf("Checkpoint 1\n");
+    //printf("Checkpoint 1\n");
     uint8_t buf[BUFFER_SIZE_KB * BYTES_IN_KB];
     ssize_t rv = ::read(conn->fd, buf, sizeof(buf));
     if (rv <= 0) {
@@ -112,7 +121,7 @@ static void handle_read(g_data &data, Conn *conn) {
     buf_append(conn->in, buf, static_cast<size_t>(rv));
 
     while (handle_request(data, conn)) {};
-    printf("Checkpoint 4\n");
+    //printf("Checkpoint 4\n");
     if (conn->out.data_begin != conn->out.data_end) {
         conn->want_read = false;
         conn->want_write = true;
@@ -146,6 +155,7 @@ static Conn *handle_accept(g_data &data, int fd) {
 }
 
 void handle_destroy(Conn *c, std::vector<Conn *> &fd2conn) {
+    printf("closing connection (fd : %d)\n", c->fd);
     (void)::close(c->fd); // c++ cast ?
     fd2conn[c->fd] = nullptr;
     dlist_detach(&c->idle_node);

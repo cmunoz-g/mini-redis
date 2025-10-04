@@ -6,9 +6,9 @@
 #include <poll.h>
 #include <time.h>
 
-static constexpr uint64_t k_idle_timeout_ms = 60000;
-static constexpr uint64_t k_read_timeout_ms = 15000;
-static constexpr uint64_t k_write_timeout_ms = 15000;
+static constexpr uint64_t k_idle_timeout_ms = 90000;
+static constexpr uint64_t k_read_timeout_ms = 30000;
+static constexpr uint64_t k_write_timeout_ms = 30000;
 static constexpr size_t k_max_key_works = 2000;
 
 uint64_t get_monotonic_msec() {

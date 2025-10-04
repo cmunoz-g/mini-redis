@@ -29,12 +29,6 @@ void buf_append(Buffer &buf, const uint8_t *data, size_t len) {
     static int i = 0;
     if (len == 0) return;
 
-    printf("%d time\n", i);
-    if (i > 10) {
-        printf("exiting buf_append");
-        exit(1);
-    }
-
     assert(buf.buffer_begin <= buf.data_begin);
     assert(buf.data_begin <= buf.data_end);
     assert(buf.data_end <= buf.buffer_end);
@@ -57,7 +51,7 @@ void buf_append(Buffer &buf, const uint8_t *data, size_t len) {
 }
 
 void buf_consume(Buffer &buf, size_t n) {
-    printf("buf consume is called\n");
+    //printf("buf consume is called\n");
     size_t used = buf_size(buf);
     assert(n <= used);
 

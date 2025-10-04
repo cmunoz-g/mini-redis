@@ -51,6 +51,7 @@ static size_t response_size(Buffer &out, size_t header) {
 
 void response_end(Buffer &out, size_t header) {
     size_t msg_size = response_size(out, header);
+    printf("response_end() : msg_size : %zu\n", msg_size);
     if (msg_size > MSG_SIZE_LIMIT) {
         buf_truncate(out, header + sizeof(uint32_t));
         out_err(out, ERR_TOO_BIG, "response is too big");
@@ -58,6 +59,7 @@ void response_end(Buffer &out, size_t header) {
     }
 
     uint32_t len = static_cast<uint32_t>(msg_size);
+    printf("response_end() : len : %u\n", len);
     uint32_t be = htobe32(len);
     std::memcpy(buf_at(out, header), &be, sizeof(uint32_t));
 }

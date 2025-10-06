@@ -59,30 +59,33 @@ static int32_t handle_write(int fd, const char *buf, size_t n) {
 }
 
 static int32_t handle_read(int fd, char *buf, size_t n) {
-    static int i = 0;
-    size_t len = n;
-    if (i) fprintf(stderr, "n : %zu\n", n);
+    // static int i = 0;
+    //size_t len = n;
+    // if (i) fprintf(stderr, "n : %zu\n", n);
     while (n > 0) {
         ssize_t rv = ::read(fd, buf, n);
-        if (i) fprintf(stderr, "bytes read : %zu\n", rv);
+        //if (i) fprintf(stderr, "bytes read : %zu\n", rv);
         if (rv <= 0) return -1;
         n -= rv;
         buf += rv;
     }
 
-    if (!i) {
-        fprintf(stderr, "bye\n");
-        exit(0);
-    }
-    i++;
+    // if (!i) {
+    //     fprintf(stderr, "bye\n");
+    //     exit(0);
+    // }
+    // i++;
     return 0;
 }
 
 static int32_t print_response(const uint8_t *data, size_t size);
 
 static int32_t print_arr(const uint8_t *data, size_t size) {
-    uint32_t len = 0;
-    memcpy(&len, &data[1], sizeof(uint32_t));
+    uint32_t len_be = 0;
+    memcpy(&len_be, &data[1], sizeof(uint32_t));
+
+    uint32_t len = be32toh(len_be);
+
     printf("(arr) len=%u\n", len); // think : do i want it printign like so ?
     size_t arr_bytes = 1 + sizeof(uint32_t);
     for (uint32_t i = 0; i < len; ++i) {
@@ -94,40 +97,58 @@ static int32_t print_arr(const uint8_t *data, size_t size) {
     return 0;
 }
 
+// Standardize either uint32_t or int32_t for sizes
+
 static int32_t print_response(const uint8_t *data, size_t size) {
     if (size < 1) return -1; // print msg : bad response
 
     switch (data[0]) {
         case TAG_NIL: printf("(nil)\n"); return 1;
         case TAG_ERR: {
-            if (size < 1 + 8) return -1; //msg bad resp
-            int32_t code = 0;
-            uint32_t len = 0;
-            memcpy(&code, &data[1], sizeof(int32_t));
-            memcpy(&len, &data[1 + sizeof(int32_t)], sizeof(uint32_t));
-            if (size < 1 + 8 + len) return -1; // bad resp
+            if (size < 1 + 8) {
+                printf("goes back first if\n");
+                return -1; //msg bad resp
+            }
+            int32_t code_be = 0;
+            uint32_t len_be = 0;
+            memcpy(&code_be, &data[1], sizeof(int32_t));
+            memcpy(&len_be, &data[1 + sizeof(int32_t)], sizeof(uint32_t));
+            
+            int32_t code = be32toh(code_be);
+            int32_t len = be32toh(len_be);
+
+            if (static_cast<int>(size) < 1 + 8 + len) {
+                printf("goes back 2nd if\n");
+                return -1; // bad resp
+            }
+            printf("(err) %d : %.*s\n", code, len, &data[1 + 8]);
             return 1 + 8 + len; // substitute references to 8 bytes for explicit sizeofs ?
                                 // also: maybe define some constexpr values  ??? 
         }
         case TAG_STR: {
             if (size < 1 + 4) return -1; // msg bad resp
-            uint32_t len = 0;
-            memcpy(&len, &data[1], sizeof(int32_t));
+            uint32_t len_be = 0;
+            memcpy(&len_be, &data[1], sizeof(int32_t));
+
+            uint32_t len = be32toh(len_be);
+
             if (size < 1 + 4 + len) return -1; // msg bad resp
             printf("(str) %.*s\n", len, &data[1 + sizeof(uint32_t)]);
             return 1 + sizeof(uint32_t) + len;
         }
         case TAG_INT: {
             if (size < 1 + 8) return -1; // msg bad resp
-            int64_t val = 0;
-            memcpy(&val, &data[1], sizeof(int64_t));
+            int64_t val_be = 0;
+            memcpy(&val_be, &data[1], sizeof(int64_t));
+            int64_t val = be64toh(val_be);
+            printf("(int) %ld\n", val);
             return 1 + sizeof(int64_t);
         }
         case TAG_DBL: {
             if (size < 1 + 8) return -1; //msgbr
             double val = 0;
             memcpy(&val, &data[1], sizeof(double));
-            printf("(dbl) %g\n", val);
+            printf("(dbl) %g\n", val); // will this work since double wasnt covnerted ?
             return 1 + sizeof(double);
         }
         case TAG_ARR: {
@@ -153,20 +174,21 @@ static int32_t read_res(int fd) {
 
     uint32_t len_be = 0;
     memcpy(&len_be, rbuf, sizeof(uint32_t));
-    uint32_t len = ntohl(len_be);
+    uint32_t len = be32toh(len_be);
 
     if (len > MSG_SIZE_LIMIT) return -1; // print err msg : msg too long . should stop client ?
 
     //fprintf(stderr, "len : %d\n", len);
     //fprintf(stderr, "Checkpoint 1\n");
     err = handle_read(fd, &rbuf[4], len);
-    fprintf(stderr, "Checkpoint 2\n");
     if (err) {
         // read() error, msg
         return err;
     }
 
     int32_t rv = print_response(reinterpret_cast<uint8_t *>(&rbuf[4]), len);
+    printf("rv is %d\n", rv);
+    exit(0);
     if (rv > 0 && static_cast<uint32_t>(rv) != len) {
         // msg print bad response
         rv = -1; // should stop execution ?

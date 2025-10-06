@@ -53,6 +53,7 @@ static bool handle_request(g_data &data, Conn *conn) {
 
     size_t header_pos = 0;
     response_begin(conn->out, &header_pos);
+    //printf("handle_request() : header_pos: %zu\n", header_pos);
     do_request(data, cmd, conn->out);
     response_end(conn->out, header_pos);
 

@@ -115,7 +115,7 @@ void out_err(Buffer &out, uint32_t code, const std::string &msg) {
 
     buf_append(out, reinterpret_cast<uint8_t *>(&size_be), sizeof(size_be));
     //printf("out_err() : size after app3 : %zu\n", buf_size(out));
-    buf_append(out, reinterpret_cast<const uint8_t *>(&msg), msg.size());
+    buf_append(out, reinterpret_cast<const uint8_t *>(msg.data()), msg.size());
 
     //printf("out_err() : size after app4 : %zu\n", buf_size(out));
 }

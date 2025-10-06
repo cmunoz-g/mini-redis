@@ -58,11 +58,14 @@ void do_del(Request &req) {
     Buffer &out = req.out;
 
     LookupKey key;
-    key.key.swap(cmd[2]);
+    key.key.swap(cmd[1]);
     key.node.hcode = hash(reinterpret_cast<uint8_t *>(key.key.data()), key.key.size());
     HNode *node = hm_lookup(&data.db, &key.node, &entry_eq);
 
-    if (node) entry_del(data, container_of(node, Entry, node));
+    if (node) {
+        hm_delete(&data.db, node, &entry_eq);
+        entry_del(data, container_of(node, Entry, node));
+    }
 
     return out_int(out, node ? 1 : 0);
 }
@@ -185,6 +188,14 @@ void do_zrem(Request &req) {
 
     const std::string &name = cmd[2];
     ZNode *znode = zset_lookup(zset, name.data(), name.size());
+
+    printf("gets here\n");
+    exit(1);
+
+    // Current status: zset_delete fails (the call to hm_delete crashes somewhere)
+    // my guess is that when doing zadd its not correctly saving up the item
+    // that or it can't find it in one ofthe HTabs and thus its crashing
+
     if (znode) zset_delete(zset, znode);
     return out_int(out, znode ? 1 : 0);
 }

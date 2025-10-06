@@ -41,7 +41,7 @@ const std::unordered_map<std::string, Command> command_list {
     {"zrem", {3, do_zrem}},
     {"zscore", {3, do_zscore}},
     {"zquery", {6, do_zquery}},
-    {"expire", {3, do_expire}},
+    {"pexpire", {3, do_expire}},
     {"quit", {1, do_quit}},
     {"exit", {1, do_quit}}
 };

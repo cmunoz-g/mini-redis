@@ -106,6 +106,8 @@ HNode *hm_lookup(HMap *hmap, HNode *key, bool (*eq)(HNode *, HNode *)) {
     return from ? *from : nullptr;
 }
 
+#include <cstdio> //delete!
+
 HNode *hm_delete(HMap *hmap, HNode *key, bool (*eq)(HNode *, HNode *)) {
     hm_help_rehashing(hmap);
     if (HNode **from = h_lookup(&hmap->newer, key, eq))

@@ -69,17 +69,7 @@ static void handle_write(DList &write_list, Conn *conn) {
     assert(size > 0);
     ssize_t rv = ::write(conn->fd, conn->out.data_begin, size);
 
-    // current status of the problem:
-    // testing with an uknown cmd, server should send 32 bytes, but here is just sending 28
-    // in the client side, the header (first 4 bytes) is correctly read as 32 bytes, but 
-    // since the server only sends 28, it hangs forever.
-    // server correctly sets the total payload size including the header
-    // now gotta figure out why is it not sending those 4 bytes ? (i assume they are bytes 29-32)
-    
-    printf("write(): tried %zu, wrote %zu\n", size, rv);
-    if ((size_t)rv < size) {
-        printf("partial write\n");
-    }
+    //printf("write(): tried %zu, wrote %zu\n", size, rv);
 
     if (rv < 0) {
         if (errno == EAGAIN) return;

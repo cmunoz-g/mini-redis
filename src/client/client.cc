@@ -105,10 +105,7 @@ static int32_t print_response(const uint8_t *data, size_t size) {
     switch (data[0]) {
         case TAG_NIL: printf("(nil)\n"); return 1;
         case TAG_ERR: {
-            if (size < 1 + 8) {
-                printf("goes back first if\n");
-                return -1; //msg bad resp
-            }
+            if (size < 1 + 8) return -1; //msg bad resp
             int32_t code_be = 0;
             uint32_t len_be = 0;
             memcpy(&code_be, &data[1], sizeof(int32_t));
@@ -117,10 +114,7 @@ static int32_t print_response(const uint8_t *data, size_t size) {
             int32_t code = be32toh(code_be);
             int32_t len = be32toh(len_be);
 
-            if (static_cast<int>(size) < 1 + 8 + len) {
-                printf("goes back 2nd if\n");
-                return -1; // bad resp
-            }
+            if (static_cast<int>(size) < 1 + 8 + len) return -1; // bad resp
             printf("(err) %d : %.*s\n", code, len, &data[1 + 8]);
             return 1 + 8 + len; // substitute references to 8 bytes for explicit sizeofs ?
                                 // also: maybe define some constexpr values  ??? 
@@ -187,8 +181,6 @@ static int32_t read_res(int fd) {
     }
 
     int32_t rv = print_response(reinterpret_cast<uint8_t *>(&rbuf[4]), len);
-    printf("rv is %d\n", rv);
-    exit(0);
     if (rv > 0 && static_cast<uint32_t>(rv) != len) {
         // msg print bad response
         rv = -1; // should stop execution ?

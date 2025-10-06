@@ -70,14 +70,11 @@ static int32_t handle_read(int fd, char *buf, size_t n) {
         buf += rv;
     }
 
-    if (i == 0) {
-        i++;
-        fprintf(stderr, "%zu\n", len);
-    }
-    else {
+    if (!i) {
         fprintf(stderr, "bye\n");
         exit(0);
     }
+    i++;
     return 0;
 }
 
@@ -160,7 +157,7 @@ static int32_t read_res(int fd) {
 
     if (len > MSG_SIZE_LIMIT) return -1; // print err msg : msg too long . should stop client ?
 
-    fprintf(stderr, "len : %d\n", len);
+    //fprintf(stderr, "len : %d\n", len);
     //fprintf(stderr, "Checkpoint 1\n");
     err = handle_read(fd, &rbuf[4], len);
     fprintf(stderr, "Checkpoint 2\n");

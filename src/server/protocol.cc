@@ -45,9 +45,8 @@ void response_begin(Buffer &out, size_t *header) {
 }
 
 static size_t response_size(Buffer &out, size_t header) {
-    size_t resp_size = buf_size(out) - header;
-    if (header) resp_size += sizeof(uint32_t);
-    return resp_size;
+    size_t size = buf_size(out);
+    return size - header - sizeof(uint32_t); 
 }
 
 void response_end(Buffer &out, size_t header) {

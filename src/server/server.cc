@@ -146,7 +146,7 @@ static Conn *handle_accept(g_data &data, int fd) {
 }
 
 void handle_destroy(Conn *c, std::vector<Conn *> &fd2conn) {
-    printf("closing connection (fd : %d)\n", c->fd);
+    printf("closing connection (fd : %d)\n", c->fd); // c->fd making the program segfault
     (void)::close(c->fd); // c++ cast ?
     fd2conn[c->fd] = nullptr;
     dlist_detach(&c->idle_node);
@@ -171,8 +171,17 @@ static bool delete_all_entries(HNode *node, void *arg) {
     return true;
 }
 
+// Situation : Work from here. Server exits when exit/quit is called
+// but final msg isnt printed.
+// Weird stuff with thread_pool_destroy too, has to be checked again.
+
 static int close_server(g_data &data, std::vector<Conn *> fd2conn) { // can this, or delete_all_entries fail at any point ?
-    for (Conn *c : fd2conn) handle_destroy(c, fd2conn);
+    for (Conn *c : fd2conn) {
+        if (c) {
+            fprintf(stderr, "handle_destroy() called from within close_server()\n");
+            handle_destroy(c, fd2conn);
+        }
+    }
     hm_foreach(&data.db, &delete_all_entries, &data);
     hm_destroy(&data.db);
     thread_pool_destroy(&data.thread_pool);
@@ -225,11 +234,16 @@ int run_server(g_data &data, const char* host, uint16_t port) {
 
             if (re & POLLIN) handle_read(data, c);
             if (re & POLLOUT) handle_write(data.write_list, c);
-            if (re & POLLERR || c->want_close) handle_destroy(c, fd2conn);
+            if (re & POLLERR || c->want_close) {
+                fprintf(stderr, "handle_destroy() called outside close_server()\n");
+                handle_destroy(c, fd2conn);
+            }
         }
         process_timers(data, fd2conn);
         if (data.close_server) return close_server(data, fd2conn);
     } 
 
+    // doesnt get printed ? why ?
+    printf("closed server\n");
     return (0);
 }

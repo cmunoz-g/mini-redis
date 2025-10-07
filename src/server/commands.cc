@@ -112,7 +112,6 @@ static bool str_to_int(const std::string s, int64_t &i) {
     return endp == s.c_str() + s.size();
 }
 
-// missing: a reversed verseion that does seek and iterate in descending order
 void do_zquery(Request &req) {
     g_data &data = req.data;
     std::vector<std::string> &cmd = req.cmd;
@@ -231,7 +230,7 @@ void do_quit(Request &req) {
     g_data &data = req.data;
     Buffer &out = req.out;
 
-    data.close_server = true;
     const std::string bye_msg = "closing mini-redis server";
-    return out_str(out, bye_msg.data(), bye_msg.size());
+    out_str(out, bye_msg.data(), bye_msg.size());
+    data.close_server = true;
 }

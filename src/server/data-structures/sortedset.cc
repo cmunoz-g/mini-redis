@@ -97,7 +97,7 @@ void zset_delete(ZSet *zset, ZNode *node) {
     key.name = node->name;
     key.len = node->len;
 
-    HNode *found = hm_delete(&zset->hmap, &node->map, &hcmp);
+    HNode *found = hm_delete(&zset->hmap, &key.node, &hcmp);
     assert(found);
 
     zset->root = avl_del(&node->tree);

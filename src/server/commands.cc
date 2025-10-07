@@ -63,7 +63,7 @@ void do_del(Request &req) {
     HNode *node = hm_lookup(&data.db, &key.node, &entry_eq);
 
     if (node) {
-        hm_delete(&data.db, node, &entry_eq);
+        hm_delete(&data.db, node, &entry_eq); // Should this be in entry_del ? bc if its called from a timeout, the node won't be removed from the db
         entry_del(data, container_of(node, Entry, node));
     }
 
@@ -188,13 +188,6 @@ void do_zrem(Request &req) {
 
     const std::string &name = cmd[2];
     ZNode *znode = zset_lookup(zset, name.data(), name.size());
-
-    printf("gets here\n");
-    exit(1);
-
-    // Current status: zset_delete fails (the call to hm_delete crashes somewhere)
-    // my guess is that when doing zadd its not correctly saving up the item
-    // that or it can't find it in one ofthe HTabs and thus its crashing
 
     if (znode) zset_delete(zset, znode);
     return out_int(out, znode ? 1 : 0);

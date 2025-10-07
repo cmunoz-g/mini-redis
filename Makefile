@@ -1,3 +1,5 @@
+all: server client
+
 NAME_SERVER = mini-redis
 NAME_CLIENT = mini-redis-client
 CXX = g++
@@ -31,8 +33,6 @@ $(NAME_SERVER): $(OBJ_SERVER)
 $(NAME_CLIENT) : $(OBJ_CLIENT)
 	$(CXX) -o $(NAME_CLIENT) $(OBJ_CLIENT)
 
-all: $(NAME_SERVER) $(NAME_CLIENT)
-
 server: $(NAME_SERVER)
 
 client: $(NAME_CLIENT)
@@ -45,4 +45,4 @@ fclean: clean
 
 re: fclean all
 
-.PHONY = all clean fclean re
+.PHONY: all clean fclean re client server

@@ -185,7 +185,7 @@ static int close_server(g_data &data, std::vector<Conn *> fd2conn) { // can this
     hm_foreach(&data.db, &delete_all_entries, &data);
     hm_destroy(&data.db);
     thread_pool_destroy(&data.thread_pool);
-    return true;
+    return 0;
 }
 
 int run_server(g_data &data, const char* host, uint16_t port) {
@@ -243,7 +243,5 @@ int run_server(g_data &data, const char* host, uint16_t port) {
         if (data.close_server) return close_server(data, fd2conn);
     } 
 
-    // doesnt get printed ? why ?
-    printf("closed server\n");
     return (0);
 }

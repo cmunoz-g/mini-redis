@@ -171,16 +171,9 @@ static bool delete_all_entries(HNode *node, void *arg) {
     return true;
 }
 
-// Situation : Work from here. Server exits when exit/quit is called
-// but final msg isnt printed.
-// Weird stuff with thread_pool_destroy too, has to be checked again.
-
-static int close_server(g_data &data, std::vector<Conn *> fd2conn) { // can this, or delete_all_entries fail at any point ?
+static int close_server(g_data &data, std::vector<Conn *> fd2conn) {
     for (Conn *c : fd2conn) {
-        if (c) {
-            fprintf(stderr, "handle_destroy() called from within close_server()\n");
-            handle_destroy(c, fd2conn);
-        }
+        if (c) handle_destroy(c, fd2conn);
     }
     hm_foreach(&data.db, &delete_all_entries, &data);
     hm_destroy(&data.db);
@@ -193,6 +186,7 @@ int run_server(g_data &data, const char* host, uint16_t port) {
     if (server_fd < 0) return 1; // think through error mgmt
 
     std::vector<Conn *> fd2conn;
+    data.connections = &fd2conn;
     std::vector<struct pollfd> pfds;
     
     for (;;) {

@@ -19,7 +19,8 @@ enum {
     TAG_STR = 2,
     TAG_INT = 3,
     TAG_DBL = 4,
-    TAG_ARR = 5
+    TAG_ARR = 5,
+    TAG_CLOSE = 6
 };
 
 enum {
@@ -43,3 +44,4 @@ void out_err(Buffer &out, uint32_t code, const std::string &msg);
 void out_dbl(Buffer &out, double val);
 size_t out_begin_arr(Buffer &out);
 void out_end_arr(Buffer &out, size_t ctx, uint32_t n);
+void out_close(Buffer &out, const char *s, size_t size);

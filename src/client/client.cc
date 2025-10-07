@@ -19,7 +19,8 @@ enum {
     TAG_STR = 2,   
     TAG_INT = 3,  
     TAG_DBL = 4,
-    TAG_ARR = 5, 
+    TAG_ARR = 5,
+    TAG_CLOSE = 6
 };
 
 int get_socket(uint16_t port) {
@@ -97,15 +98,21 @@ static int32_t print_arr(const uint8_t *data, size_t size) {
     return 0;
 }
 
+enum {
+    RESP_OK = 0,
+    RESP_INCOMPLETE = 1,
+    RESP_CLOSE = 2
+};
+
 // Standardize either uint32_t or int32_t for sizes
 
 static int32_t print_response(const uint8_t *data, size_t size) {
     if (size < 1) return -1; // print msg : bad response
 
     switch (data[0]) {
-        case TAG_NIL: printf("(nil)\n"); return 1;
+        case TAG_NIL: printf("(nil)\n"); return RESP_OK;
         case TAG_ERR: {
-            if (size < 1 + 8) return -1; //msg bad resp
+            if (size < 1 + 8) return RESP_INCOMPLETE; //msg bad resp
             int32_t code_be = 0;
             uint32_t len_be = 0;
             memcpy(&code_be, &data[1], sizeof(int32_t));
@@ -114,44 +121,51 @@ static int32_t print_response(const uint8_t *data, size_t size) {
             int32_t code = be32toh(code_be);
             int32_t len = be32toh(len_be);
 
-            if (static_cast<int>(size) < 1 + 8 + len) return -1; // bad resp
+            if (static_cast<int>(size) < 1 + 8 + len) return RESP_INCOMPLETE; // bad resp
             printf("(err) %d : %.*s\n", code, len, &data[1 + 8]);
-            return 1 + 8 + len; // substitute references to 8 bytes for explicit sizeofs ?
+            return RESP_OK; // substitute references to 8 bytes for explicit sizeofs ?
                                 // also: maybe define some constexpr values  ??? 
         }
         case TAG_STR: {
-            if (size < 1 + 4) return -1; // msg bad resp
+            if (size < 1 + 4) return RESP_INCOMPLETE; // msg bad resp
             uint32_t len_be = 0;
             memcpy(&len_be, &data[1], sizeof(int32_t));
 
             uint32_t len = be32toh(len_be);
 
-            if (size < 1 + 4 + len) return -1; // msg bad resp
+            if (size < 1 + 4 + len) return RESP_INCOMPLETE; // msg bad resp
             printf("(str) %.*s\n", len, &data[1 + sizeof(uint32_t)]);
-            return 1 + sizeof(uint32_t) + len;
+            return RESP_OK;
         }
         case TAG_INT: {
-            if (size < 1 + 8) return -1; // msg bad resp
+            if (size < 1 + 8) return RESP_INCOMPLETE; // msg bad resp
             int64_t val_be = 0;
             memcpy(&val_be, &data[1], sizeof(int64_t));
             int64_t val = be64toh(val_be);
             printf("(int) %ld\n", val);
-            return 1 + sizeof(int64_t);
+            return RESP_OK;
         }
         case TAG_DBL: {
-            if (size < 1 + 8) return -1; //msgbr
+            if (size < 1 + 8) return RESP_INCOMPLETE; //msgbr
             double val = 0;
             memcpy(&val, &data[1], sizeof(double));
             printf("(dbl) %g\n", val); // will this work since double wasnt covnerted ?
-            return 1 + sizeof(double);
+            return RESP_OK;
         }
         case TAG_ARR: {
-            if (size < 1 + 4) return -1; //msgbr
+            if (size < 1 + 4) return RESP_INCOMPLETE; //msgbr
             return print_arr(data, size);
+        }
+        case TAG_CLOSE: { // REDO FORMAT
+            uint32_t len_be = 0;
+            memcpy(&len_be, &data[1], sizeof(int32_t));
+            uint32_t len = be32toh(len_be);
+            printf("(close) %.*s\n", len, &data[1 + sizeof(uint32_t)]);
+            return RESP_CLOSE;
         }
         default: {
             //msg bad resposne
-            return -1;
+            return RESP_INCOMPLETE;
         }
     }
 }
@@ -180,10 +194,9 @@ static int32_t read_res(int fd) {
         return err;
     }
 
-    int32_t rv = print_response(reinterpret_cast<uint8_t *>(&rbuf[4]), len);
-    if (rv > 0 && static_cast<uint32_t>(rv) != len) {
-        // msg print bad response
-        rv = -1; // should stop execution ?
+    int rv = print_response(reinterpret_cast<uint8_t *>(&rbuf[4]), len);
+    if (rv == RESP_INCOMPLETE) {
+        printf("resp incomplete\n"); // response incomplete, figure out format later.
     }
     return rv;
 }
@@ -211,6 +224,9 @@ static int32_t send_req(int fd, std::vector<std::string> &cmd) {
     return handle_write(fd, wbuf, len + 4); // len + 4 len represents [size of total payload] but doesnt include the 4 bytes of itself
 }
 
+// Situation : Server side code regarding closing seems to work fine
+// The issue is that the client is not printing the exit msg and is not exiting the program
+
 int run_client(uint16_t port) {
     int fd = get_socket(port);
     if (fd < 0) return -1;
@@ -223,11 +239,11 @@ int run_client(uint16_t port) {
         std::vector<std::string> cmd = split(line);
         if (cmd.empty()) continue;
         if (send_req(fd, cmd)) void(0); // errmgmt problem: could return non-zero if msg is larger than max size(non fatal) or if write fails in handle_write(fatal)
-        if (cmd[0] == "exit" || cmd[0] == "quit") {
+        if (read_res(fd) == RESP_CLOSE) {
+            printf("got here\n");
             ::close(fd);
             return 0;
-        }
-        if (read_res(fd)) void(0); // same thing
+        }; 
     
     }
 }

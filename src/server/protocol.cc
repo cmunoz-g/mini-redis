@@ -74,7 +74,7 @@ void out_str(Buffer &out, const char *s, size_t size) {
     uint8_t tag = TAG_STR;
     buf_append(out, &tag, sizeof(tag));
 
-    if (size > std::numeric_limits<uint32_t>::max()) return out_err(out, ERR_TOO_BIG, "string len too big");
+    if (size > std::numeric_limits<uint32_t>::max()) return out_err(out, ERR_TOO_BIG, "string len too big"); // not needed ????
     uint32_t len = static_cast<uint32_t>(size);
     uint32_t be = htobe32(len);
 
@@ -141,4 +141,28 @@ void out_end_arr(Buffer &out, size_t ctx, uint32_t n) {
 
     uint32_t be = htobe32(n);
     memcpy(buf_at(out, ctx), &be, sizeof(be));
+}
+
+// void out_str(Buffer &out, const char *s, size_t size) {
+//     uint8_t tag = TAG_STR;
+//     buf_append(out, &tag, sizeof(tag));
+
+//     if (size > std::numeric_limits<uint32_t>::max()) return out_err(out, ERR_TOO_BIG, "string len too big");
+//     uint32_t len = static_cast<uint32_t>(size);
+//     uint32_t be = htobe32(len);
+
+//     buf_append(out, reinterpret_cast<uint8_t *>(&be), sizeof(be));
+//     buf_append(out, reinterpret_cast<const uint8_t *>(s), size);
+// }
+
+void out_close(Buffer &out, const char *s, size_t size) {
+    printf("called out_close() \n");
+    uint8_t tag = TAG_CLOSE;
+    buf_append(out, &tag, sizeof(tag));
+
+    uint32_t len = static_cast<uint32_t>(size);
+    uint32_t be = htobe32(len);
+    
+    buf_append(out, reinterpret_cast<uint8_t *>(&be), sizeof(be));
+    buf_append(out, reinterpret_cast<const uint8_t *>(s), size);
 }

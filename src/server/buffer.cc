@@ -21,6 +21,11 @@ void buf_truncate(Buffer &b, size_t new_size) {
     b.data_end = b.data_begin + new_size;
 }
 
+void buf_reset(Buffer &b) {
+    b.data_begin = b.buffer_begin;
+    b.data_end = b.buffer_begin;
+}
+
 /* Append & consume*/
 
 #include <cstdlib> // borrar

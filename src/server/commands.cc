@@ -8,6 +8,7 @@
 #include <cassert>
 #include <cmath>
 #include <unordered_map>
+#include <unistd.h>
 
 void do_get(Request &req) {
     g_data &data = req.data;
@@ -228,9 +229,15 @@ void do_expire(Request &req) {
 
 void do_quit(Request &req) {
     g_data &data = req.data;
-    Buffer &out = req.out;
 
-    const std::string bye_msg = "closing mini-redis server";
-    out_str(out, bye_msg.data(), bye_msg.size());
+    for (Conn *c : *(data.connections)) {
+        if (c) {
+            buf_reset(c->out);
+            std::string bye_msg = "closing server\n";
+            out_close(c->out, bye_msg.data(), bye_msg.size());
+            ::write(c->fd, &c->out, buf_size(c->out)); // no need to do anything with result right ?
+        }
+    }
+
     data.close_server = true;
 }

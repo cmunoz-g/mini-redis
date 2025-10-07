@@ -20,6 +20,7 @@ struct g_data {
     std::vector<HeapItem> heap;
     ThreadPool thread_pool;
     bool close_server;
+    std::vector<Conn *> *connections;
 };
 
 int run_server(g_data &data, const char* host, uint16_t port);

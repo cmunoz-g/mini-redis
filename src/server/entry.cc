@@ -32,7 +32,7 @@ static void entry_del_f(void *arg) {
 void entry_del(g_data &data, Entry *ent) {
     entry_set_ttl(data.heap, ent, -1);
     size_t set_size = ent->type == T_ZSET ? hm_size(&ent->zset.hmap) : 0;
-    
+
     if (set_size > k_large_container_size)
         thread_pool_queue(&data.thread_pool, &entry_del_f, ent);
     else

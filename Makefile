@@ -11,7 +11,7 @@ OBJ_FOLDER_CLIENT =	obj/client
 INCLUDES_SERVER = includes/server includes/server/data-structures
 INCLUDES_CLIENT = includes/client
 SRC_SERVER = buffer.cc commands.cc entry.cc main.cc protocol.cc \
-	server.cc socket.cc threadpool.cc timer.cc \
+	server.cc socket.cc threadpool.cc timer.cc utils.cc \
 	data-structures/avltree.cc data-structures/dlist.cc \
 	data-structures/hashtable.cc data-structures/heap.cc \
 	data-structures/sortedset.cc

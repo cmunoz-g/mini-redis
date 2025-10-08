@@ -9,5 +9,5 @@ int err_msg(const char *msg, int fatal) {
 
 // This is maybe not needed
 void notification_msg(const char *msg) {
-    printf("Notification: %s");
+    printf("Notification: %s", msg);
 }

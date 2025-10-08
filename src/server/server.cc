@@ -1,9 +1,9 @@
 #include "server.hh"
+#include "entry.hh"
 #include "timer.hh"
+#include "utils.hh"
 #include "socket.hh"
 #include "commands.hh"
-#include "entry.hh"
-#include "utils.hh"
 #include <poll.h>
 #include <cstring>
 #include <assert.h>
@@ -148,8 +148,11 @@ static bool delete_all_entries(HNode *node, void *arg) {
     g_data *data = static_cast<g_data *>(arg);
     Entry *ent = container_of(node, Entry, node);
     entry_del(*data, ent);
+    printf("hola");
+    exit(0);
     return true;
 }
+
 
 static int close_server(g_data &data, std::vector<Conn *> fd2conn) {
     for (Conn *c : fd2conn) {
@@ -158,6 +161,7 @@ static int close_server(g_data &data, std::vector<Conn *> fd2conn) {
     hm_foreach(&data.db, &delete_all_entries, &data);
     hm_destroy(&data.db);
     thread_pool_destroy(&data.thread_pool);
+    printf("Closing server\n");
     return 0;
 }
 

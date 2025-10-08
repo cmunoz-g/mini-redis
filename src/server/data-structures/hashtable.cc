@@ -47,8 +47,11 @@ static bool h_foreach(HTab *htab, bool (*f)(HNode *, void *), void *arg) {
 
     const size_t buckets = htab->mask + 1;
     for (size_t i = 0; i < buckets; ++i) {
-        for (HNode *node = htab->tab[i]; node; node = node->next) {
+        HNode *node = htab->tab[i];
+        while (node) {
+            HNode *next = node->next;
             if (!f(node, arg)) return false;
+            node = next;
         }
     }
     return true;
@@ -130,7 +133,7 @@ size_t hm_size(HMap *hmap) {
     return (hmap->newer.size + hmap->older.size);
 }
 
-// Foreach on the newer (the one that contains the item) is crashing when deletingall entries
+// Foreach on the newer (the one that contains the item) is crashing when deleting all entries
 // Return this function to its previous state once fixed (or change signature to void idk)
 
 // Tested hm_foreach with a dummy ft and nothing broke, so error is most likely inside

@@ -7,11 +7,11 @@
 #include "threadpool.hh"
 
 struct Conn { 
-    int fd{-1};
-    bool want_read{true}, want_write{false}, want_close{false};
+    int fd = -1;
+    bool want_read = true, want_write = false, want_close = false;
     Buffer in, out;
     DList idle_node, read_node, write_node;
-    uint64_t last_active_ms{0}, last_read_ms{0}, last_write_ms{0};
+    uint64_t last_active_ms = 0, last_read_ms = 0, last_write_ms = 0;
 };
 
 struct g_data {

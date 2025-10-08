@@ -14,7 +14,7 @@ static bool hcmp(HNode *node, HNode *key) {
 
 static ZNode *znode_new(const char *name, size_t len, double score) {
     size_t bytes = offsetof(struct ZNode, name) + len;
-    ZNode *node = static_cast<ZNode *>(std::malloc(bytes)); // should it be a C style cast ?
+    ZNode *node = static_cast<ZNode *>(std::malloc(bytes));
     if (!node) return nullptr;
 
     avl_init(&node->tree);
@@ -51,7 +51,7 @@ static bool zless(AVLNode *lhs, AVLNode *rhs) {
     return (rv != 0) ? (rv < 0) : (zl->len < zr->len);
 }
 
-static bool zless(AVLNode *lhs, double score, const char *name, size_t len) { // change name ? or signature can stay zless ?
+static bool zless(AVLNode *lhs, double score, const char *name, size_t len) {
     ZNode *zl = container_of(lhs, ZNode, tree);
     if (zl->score != score) return zl->score < score;
     

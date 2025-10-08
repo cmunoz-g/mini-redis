@@ -1,7 +1,6 @@
 #include "buffer.hh"
 #include <cstring>
 #include <cassert>
-#include <cstdio> // quitar
 
 /* Utils */
 
@@ -28,8 +27,6 @@ void buf_reset(Buffer &b) {
 
 /* Append & consume*/
 
-#include <cstdlib> // borrar
-
 void buf_append(Buffer &buf, const uint8_t *data, size_t len) {
     if (len == 0) return;
 
@@ -47,14 +44,13 @@ void buf_append(Buffer &buf, const uint8_t *data, size_t len) {
         free = static_cast<size_t>(buf.buffer_end - buf.data_end);
     }
 
-    if (free < len) void(0); // meaning, still no room left to append. buf_append()
-    // could return a bool and the situation be managed in the caller ft.
+    if (free < len) buf_reset(buf);
+
     std::memcpy(buf.data_end, data, len);
     buf.data_end += len;
 }
 
 void buf_consume(Buffer &buf, size_t n) {
-    //printf("buf consume is called\n");
     size_t used = buf_size(buf);
     assert(n <= used);
 

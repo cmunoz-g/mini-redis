@@ -46,7 +46,7 @@ static void process_idle_timers(DList &list, std::vector<Conn *> &fd2conn, uint6
         Conn *c = container_of(list.next, Conn, idle_node);
         uint64_t expire = c->last_active_ms + k_idle_timeout_ms;
         if (expire > now) break;
-        fprintf(stderr, "removing idle connection: %d\n", c->fd);
+        printf("Removing idle connection for client #%d\n", c->fd);
         handle_destroy(c, fd2conn);
     }
 }
@@ -56,7 +56,7 @@ static void process_read_timers(DList &list, std::vector<Conn *> &fd2conn, uint6
         Conn *c = container_of(list.next, Conn, read_node);
         uint64_t expire = c->last_read_ms + k_read_timeout_ms;
         if (expire > now) break;
-        fprintf(stderr, "removing connection (read timeout): %d\n", c->fd);
+        printf("Removing connection for client #%d (read timeout)\n", c->fd);
         handle_destroy(c, fd2conn);
     }
 }
@@ -66,7 +66,7 @@ static void process_write_timers(DList &list, std::vector<Conn *> &fd2conn, uint
         Conn *c = container_of(list.next, Conn, write_node);
         uint64_t expire = c->last_write_ms + k_write_timeout_ms;
         if (expire > now) break;
-        fprintf(stderr, "removing connection (write timeout): %d\n", c->fd);
+        printf("Removing connection for client #%d (write timeout)\n", c->fd);
         handle_destroy(c, fd2conn);
     }
 }

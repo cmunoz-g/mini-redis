@@ -8,8 +8,6 @@ void thread_pool_queue(ThreadPool *tp, void(*f)(void *), void *arg) {
     pthread_mutex_unlock(&tp->mu);
 }
 
-#include <cstdio>
-
 static void *worker(void *arg) {
     ThreadPool *tp = static_cast<ThreadPool *>(arg);
 
@@ -38,12 +36,9 @@ void thread_pool_init(ThreadPool *tp, size_t num_threads) {
     tp->threads.resize(num_threads);
     for (size_t i = 0; i < num_threads; ++i) {
         int rv = pthread_create(&tp->threads[i], nullptr, &worker, tp);
-        assert(rv == 0); // best way to check for errors ?
+        assert(rv == 0);
     }
 }
-
-#include <cstdlib>
-#include <cerrno>
 
 void thread_pool_destroy(ThreadPool *tp) {
     pthread_mutex_lock(&tp->mu);

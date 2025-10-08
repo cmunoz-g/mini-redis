@@ -23,7 +23,7 @@ void do_get(Request &req) {
     if (!node) return out_nil(out);
 
     Entry *ent = container_of(node, Entry, node);
-    if (ent->type != T_STR) return out_err(out, ERR_BAD_TYPE, "not a string value");
+    if (ent->type != T_STR) return out_err(out, ERR_BAD_TYPE, "Not a string value");
 
     return out_str(out, ent->str.data(), ent->str.size());
 }
@@ -40,7 +40,7 @@ void do_set(Request &req) {
 
     if (node) {
         Entry *ent = container_of(node, Entry, node);
-        if (ent->type != T_STR) return out_err(out, ERR_BAD_TYPE, "not a string value");
+        if (ent->type != T_STR) return out_err(out, ERR_BAD_TYPE, "Not a string value");
         ent->str.swap(cmd[2]);
     }
     else {
@@ -50,7 +50,8 @@ void do_set(Request &req) {
         ent->str.swap(cmd[2]);
         hm_insert(&data.db, &ent->node);
     }
-    return out_nil(out);
+    std::string ok_msg = "OK";
+    return out_str(out, ok_msg.data(), ok_msg.size());
 }
 
 void do_del(Request &req) {
@@ -104,7 +105,8 @@ static ZSet *expect_zset(HMap &db, std::string s) {
 static bool str_to_double(const std::string s, double &d) {
     char *endp = nullptr;
     d = std::strtod(s.c_str(), &endp);
-    return endp == s.c_str() + s.size() && !std::isnan(d);
+    if (d == 0.0) d = 0.0;
+    return endp == s.c_str() + s.size() && std::isfinite(d);
 }
 
 static bool str_to_int(const std::string s, int64_t &i) {
@@ -119,17 +121,17 @@ void do_zquery(Request &req) {
     Buffer &out = req.out;
 
     ZSet *zset = expect_zset(data.db, cmd[1]);
-    if (!zset) return out_err(out, ERR_BAD_TYPE, "expect zset");
+    if (!zset) return out_err(out, ERR_BAD_TYPE, "Expected zset");
 
     double score = 0;
     if (!str_to_double(cmd[2], score))
-        return out_err(out, ERR_BAD_ARG, "expected fp number");
+        return out_err(out, ERR_BAD_ARG, "Expected fp number");
 
     const std::string name = cmd[3];
 
     int64_t offset = 0, limit = 0;
     if (!str_to_int(cmd[4], offset) || !str_to_int(cmd[5], limit))
-        return out_err(out, ERR_BAD_ARG, "expected int");
+        return out_err(out, ERR_BAD_ARG, "Expected int");
     
     ZNode *znode = zset_seekge(zset, score, name.data(), name.size());
     znode = znode_offset(znode, offset);
@@ -145,17 +147,14 @@ void do_zquery(Request &req) {
     out_end_arr(out, ctx, static_cast<uint32_t>(n));
 }
 
-// zadd zset score name
 void do_zadd(Request &req) {
     g_data &data = req.data;
     std::vector<std::string> &cmd = req.cmd;
     Buffer &out = req.out;
 
     double score = 0;
-    if (!str_to_double(cmd[2], score)) out_err(out, ERR_BAD_ARG, "expected fp number");
+    if (!str_to_double(cmd[2], score)) out_err(out, ERR_BAD_ARG, "Expected fp number");
 
-    // this is done instead of calling expect_zset because the results
-    // from hash() and hm_lookup() are both needed
     LookupKey key;
     key.key.swap(cmd[1]);
     key.node.hcode = hash(reinterpret_cast<uint8_t *>(key.key.data()), key.key.size());
@@ -170,7 +169,7 @@ void do_zadd(Request &req) {
     }
     else {
         ent = container_of(node, Entry, node);
-        if (ent->type != T_ZSET) out_err(out, ERR_BAD_TYPE, "expected zset");
+        if (ent->type != T_ZSET) out_err(out, ERR_BAD_TYPE, "Expected zset");
     }
 
     const std::string &name = cmd[3];
@@ -184,7 +183,7 @@ void do_zrem(Request &req) {
     Buffer &out = req.out;
 
     ZSet *zset = expect_zset(data.db, cmd[1]);
-    if (!zset) out_err(out, ERR_BAD_TYPE, "expected zset");
+    if (!zset) out_err(out, ERR_BAD_TYPE, "Expected zset");
 
     const std::string &name = cmd[2];
     ZNode *znode = zset_lookup(zset, name.data(), name.size());
@@ -199,7 +198,7 @@ void do_zscore(Request &req) {
     Buffer &out = req.out;
 
     ZSet *zset = expect_zset(data.db, cmd[1]);
-    if (!zset) out_err(out, ERR_BAD_TYPE, "expected zset");
+    if (!zset) out_err(out, ERR_BAD_TYPE, "Expected zset");
     
     const std::string &name = cmd[2];
     ZNode *znode = zset_lookup(zset, name.data(), name.size());
@@ -212,7 +211,7 @@ void do_expire(Request &req) {
     Buffer &out = req.out;
 
     int64_t ttl_ms = 0;
-    if (!str_to_int(cmd[2], ttl_ms)) return out_err(out, ERR_BAD_TYPE, "expected int");
+    if (!str_to_int(cmd[2], ttl_ms)) return out_err(out, ERR_BAD_TYPE, "Expected int");
 
     LookupKey key;
     key.key.swap(cmd[1]);
@@ -233,14 +232,14 @@ void do_quit(Request &req) {
     for (Conn *c : *(data.connections)) {
         if (c) {
             buf_reset(c->out);
-            std::string bye_msg = "closing server\n";
+            std::string bye_msg = "Closing server\n";
             size_t header_pos = 0;
             
             response_begin(c->out, &header_pos);
             out_close(c->out, bye_msg.data(), bye_msg.size());
             response_end(c->out, header_pos);
 
-            ::write(c->fd, c->out.data_begin, buf_size(c->out)); // no need to do anything with result right ? 
+            ::write(c->fd, c->out.data_begin, buf_size(c->out));
         }
     }
     data.close_server = true;

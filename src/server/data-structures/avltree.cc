@@ -22,16 +22,6 @@ static void avl_update(AVLNode *node) {
     node->count = 1 + avl_count(node->l) + avl_count(node->r);
 }
 
-// static uint8_t avl_get_height_diff(AVLNode *node) {
-//     uintptr_t p = reinterpret_cast<uintptr_t>(node->parent);
-//     return p & 0b11;
-// }
-
-// static AVLNode *avl_get_parent(AVLNode *node) {
-//     uintptr_t p = reinterpret_cast<uintptr_t>(node->parent);
-//     return reinterpret_cast<AVLNode *>(p & (~0b11));
-// }
-
 static AVLNode *rot_left(AVLNode *node) {
     AVLNode *parent = node->parent;
     AVLNode *new_node = node->r;
@@ -122,8 +112,7 @@ AVLNode *avl_del(AVLNode *node) {
     while (successor->l) successor = successor->l;
 
     AVLNode *root = avl_del_one_empty_child(successor);
-    *successor = *node; // successor copies the data of node
-    // meaning: s->l, s->r and s->parent are now those of node
+    *successor = *node;
     if (successor->l) successor->l->parent = successor;
     if (successor->r) successor->r->parent = successor;
 

@@ -123,8 +123,7 @@ static int32_t print_response(const uint8_t *data, size_t size) {
 
             if (static_cast<int>(size) < 1 + 8 + len) return RESP_INCOMPLETE; // bad resp
             printf("(err) %d : %.*s\n", code, len, &data[1 + 8]);
-            return RESP_OK; // substitute references to 8 bytes for explicit sizeofs ?
-                                // also: maybe define some constexpr values  ??? 
+            return RESP_OK;
         }
         case TAG_STR: {
             if (size < 1 + 4) return RESP_INCOMPLETE; // msg bad resp

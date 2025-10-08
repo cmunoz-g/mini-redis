@@ -14,11 +14,8 @@
 static constexpr size_t BUFFER_SIZE_KB = 64;
 static constexpr size_t BYTES_IN_KB = 1024;
 
-static void do_request(g_data &data, std::vector<std::string> &cmd, Buffer &out) { // make this bool ?
-    //printf("Checkpoint 2\n");
-    if (cmd.empty()) return out_err(out, ERR_EMPTY, "empty command"); // controlled for in client.cpp i thiink its not necessary
-
-    //for (auto s : cmd) printf("%s\n", s.c_str());
+static void do_request(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
+    if (cmd.empty()) return out_err(out, ERR_EMPTY, "empty command");
 
     auto it = command_list.find(cmd[0]);
     if (it == command_list.end()) return out_err(out, ERR_UNKNOWN, "unknown command");
@@ -53,12 +50,9 @@ static bool handle_request(g_data &data, Conn *conn) {
 
     size_t header_pos = 0;
     response_begin(conn->out, &header_pos);
-    //printf("handle_request() : header_pos: %zu\n", header_pos);
     do_request(data, cmd, conn->out);
     response_end(conn->out, header_pos);
-
     buf_consume(conn->in, sizeof(uint32_t) + len);
-    //printf("Checkpoint 3, there should be : 6 calls to buf_append\n");
 
     return true; 
 }
@@ -68,8 +62,6 @@ static void handle_write(DList &write_list, Conn *conn) {
 
     assert(size > 0);
     ssize_t rv = ::write(conn->fd, conn->out.data_begin, size);
-
-    //printf("write(): tried %zu, wrote %zu\n", size, rv);
 
     if (rv < 0) {
         if (errno == EAGAIN) return;
@@ -88,16 +80,7 @@ static void handle_write(DList &write_list, Conn *conn) {
     }
 }
 
-// size_t strip_ctrl_chars(char *buf, size_t len) { // move over to utils.hh
-//     while (len > 0) {
-//         if (buf[len - 1] <= 0x1F || buf[len - 1] == 0x7F) len--;
-//         else break;
-//     }
-//     return len;
-// }
-
 static void handle_read(g_data &data, Conn *conn) { 
-    //printf("Checkpoint 1\n");
     uint8_t buf[BUFFER_SIZE_KB * BYTES_IN_KB];
     ssize_t rv = ::read(conn->fd, buf, sizeof(buf));
     if (rv <= 0) {
@@ -112,7 +95,6 @@ static void handle_read(g_data &data, Conn *conn) {
     buf_append(conn->in, buf, static_cast<size_t>(rv));
 
     while (handle_request(data, conn)) {};
-    //printf("Checkpoint 4\n");
     if (conn->out.data_begin != conn->out.data_end) {
         conn->want_read = false;
         conn->want_write = true;
@@ -124,8 +106,14 @@ static Conn *handle_accept(g_data &data, int fd) {
     struct sockaddr_in client_addr = {};
     socklen_t addrlen = sizeof(client_addr);
     int connfd = ::accept(fd, reinterpret_cast<sockaddr *>(&client_addr), &addrlen);
-    if (connfd < 0) return nullptr;
-    if (set_non_blocking(connfd)) (void)0; // handle error
+    if (connfd < 0) {
+        err_msg("::accept() failed on client fd. Connection discarded\n", 0);
+        return nullptr;
+    }
+    if (set_non_blocking(connfd)) {
+        err_msg("::fcntl() failed on client fd. Connection discarded\n", 0);
+        return nullptr;
+    }
     
     Conn *conn = new Conn();
     conn->fd = connfd;
@@ -146,8 +134,8 @@ static Conn *handle_accept(g_data &data, int fd) {
 }
 
 void handle_destroy(Conn *c, std::vector<Conn *> &fd2conn) {
-    printf("closing connection (fd : %d)\n", c->fd); // c->fd making the program segfault
-    (void)::close(c->fd); // c++ cast ?
+    printf("Closing connection for client #%d\n", c->fd);
+    ::close(c->fd);
     fd2conn[c->fd] = nullptr;
     dlist_detach(&c->idle_node);
     dlist_detach(&c->read_node);
@@ -155,14 +143,6 @@ void handle_destroy(Conn *c, std::vector<Conn *> &fd2conn) {
     // Check Conn creation, i'm doing new for both in,out Buffers. Dangling ?
     delete c;
 }
-
-// struct g_data {
-//     HMap db;
-//     DList idle_list, write_list, read_list;
-//     std::vector<HeapItem> heap;
-//     ThreadPool thread_pool;
-//     bool close_server;
-// };
 
 static bool delete_all_entries(HNode *node, void *arg) {
     g_data *data = static_cast<g_data *>(arg);
@@ -183,7 +163,7 @@ static int close_server(g_data &data, std::vector<Conn *> fd2conn) {
 
 int run_server(g_data &data, const char* host, uint16_t port) {
     int server_fd = socket_listen(host, port);
-    if (server_fd < 0) return 1; // think through error mgmt
+    if (server_fd < 0) return -1;
 
     std::vector<Conn *> fd2conn;
     data.connections = &fd2conn;
@@ -206,10 +186,10 @@ int run_server(g_data &data, const char* host, uint16_t port) {
         int rv = ::poll(pfds.data(), (nfds_t)pfds.size(), timeout_ms);
         if (rv < 0) {
             if (errno == EINTR) continue;
-            //else manage fatal error 
+            else return err_msg("::poll() failed", 1);
         }
 
-        if (pfds[0].revents & POLLIN) { // revents in the server_fd aka new connections
+        if (pfds[0].revents & POLLIN) {
             if (Conn *c = handle_accept(data, server_fd)) {
                 if (fd2conn.size() <= (size_t)c->fd) fd2conn.resize(c->fd + 1);
                 fd2conn[c->fd] = c;
@@ -228,14 +208,11 @@ int run_server(g_data &data, const char* host, uint16_t port) {
 
             if (re & POLLIN) handle_read(data, c);
             if (re & POLLOUT) handle_write(data.write_list, c);
-            if (re & POLLERR || c->want_close) {
-                fprintf(stderr, "handle_destroy() called outside close_server()\n");
-                handle_destroy(c, fd2conn);
-            }
+            if (re & POLLERR || c->want_close) handle_destroy(c, fd2conn);
         }
         process_timers(data, fd2conn);
         if (data.close_server) return close_server(data, fd2conn);
     } 
 
-    return (0);
+    return 0;
 }

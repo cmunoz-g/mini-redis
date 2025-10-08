@@ -40,7 +40,7 @@ void entry_del(g_data &data, Entry *ent) {
 }
 
 void entry_set_ttl(std::vector<HeapItem> &heap, Entry *ent, int64_t ttl_ms) {
-    if (ttl_ms < 0 && ent->heap_idx != HEAP_INVALID) { // negative ttl_ms = remove
+    if (ttl_ms < 0 && ent->heap_idx != HEAP_INVALID) {
         heap_delete(heap, ent->heap_idx);
         ent->heap_idx = HEAP_INVALID;
     }

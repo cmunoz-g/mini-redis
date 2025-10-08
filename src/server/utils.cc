@@ -6,8 +6,3 @@ int err_msg(const char *msg, int fatal) {
     if (fatal) fprintf(stderr, "Closing server\n");
     return -1;
 }
-
-// This is maybe not needed
-void notification_msg(const char *msg) {
-    printf("Notification: %s", msg);
-}

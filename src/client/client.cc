@@ -33,8 +33,11 @@ int get_socket(uint16_t port) {
     addr.sin_addr.s_addr = ntohl(INADDR_LOOPBACK);
 
     int rv = ::connect(fd, reinterpret_cast<const struct sockaddr *>(&addr), sizeof(addr));
-    if (rv) void(0); // error mgm, i think should be fatal, close(fd);
-
+    if (rv) {
+        ::close(fd);
+        fprintf(stderr, "Error: Could not connect to server\n");
+        return -1;
+    }
     return fd;
 }
 
@@ -221,9 +224,6 @@ static int32_t send_req(int fd, std::vector<std::string> &cmd) {
 
     return handle_write(fd, wbuf, len + 4); // len + 4 len represents [size of total payload] but doesnt include the 4 bytes of itself
 }
-
-// Situation : Server side code regarding closing seems to work fine
-// The issue is that the client is not printing the exit msg and is not exiting the program
 
 int run_client(uint16_t port) {
     int fd = get_socket(port);

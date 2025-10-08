@@ -130,11 +130,12 @@ static Conn *handle_accept(g_data &data, int fd) {
     conn->in = {inbuf, inbuf + buffer_size, inbuf, inbuf};
     conn->out = {outbuf, outbuf + buffer_size, outbuf, outbuf};
 
+    printf("Notification: Accepted connection #%d\n", connfd);
     return conn;
 }
 
 void handle_destroy(Conn *c, std::vector<Conn *> &fd2conn) {
-    printf("Closing connection for client #%d\n", c->fd);
+    printf("Notification: Closing connection for client #%d\n", c->fd);
     ::close(c->fd);
     fd2conn[c->fd] = nullptr;
     dlist_detach(&c->idle_node);
@@ -160,7 +161,7 @@ static int close_server(g_data &data, std::vector<Conn *> fd2conn) {
     hm_foreach(&data.db, &delete_all_entries, &data);
     hm_destroy(&data.db);
     thread_pool_destroy(&data.thread_pool);
-    printf("Closing server\n");
+    printf("Notification: Closing server\n");
     return 0;
 }
 
@@ -172,6 +173,7 @@ int run_server(g_data &data, const char* host, uint16_t port) {
     data.connections = &fd2conn;
     std::vector<struct pollfd> pfds;
     
+    printf("Notification: Opening server on port #%d\n", port);
     for (;;) {
         pfds.clear();
         pfds.push_back(pollfd{server_fd, POLLIN, 0});

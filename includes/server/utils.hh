@@ -6,4 +6,3 @@
     ((T *)((char *)(ptr) - offsetof(T, member)))
 
 int err_msg(const char *msg, int fatal);
-void notification_msg(const char *msg);

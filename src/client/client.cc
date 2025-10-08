@@ -84,20 +84,29 @@ static int32_t handle_read(int fd, char *buf, size_t n) {
 
 static int32_t print_response(const uint8_t *data, size_t size);
 
+// Situation: Since I changed the return meaning on print_response, print_arr stopped worker
+// Also want to change the styling of the arrays
+// Either fix print_arr so it prints by itself or return to previous print_response() (dont think its the best idea)
+
 static int32_t print_arr(const uint8_t *data, size_t size) {
+    (void)size;
     uint32_t len_be = 0;
     memcpy(&len_be, &data[1], sizeof(uint32_t));
 
     uint32_t len = be32toh(len_be);
 
-    printf("(arr) len=%u\n", len); // think : do i want it printign like so ?
     size_t arr_bytes = 1 + sizeof(uint32_t);
+    printf("len %d\n", len); // Len is 0 ??
+
     for (uint32_t i = 0; i < len; ++i) {
-        int32_t rv = print_response(&data[arr_bytes], size - arr_bytes);
-        if (rv < 0) return rv;
-        arr_bytes += static_cast<size_t>(rv);
+        printf("%d) ", i+1);
+        uint32_t bytes = 0;
+        memcpy(&bytes, &data[arr_bytes + 1], sizeof(uint32_t));
+        printf("\"%.*s\"\n", bytes, &data[1 + arr_bytes]);
+        //print_response(&data[arr_bytes], size - arr_bytes);
+        //if (rv < 0) return rv;
+        arr_bytes += static_cast<size_t>(bytes);
     }
-    printf("(arr) end\n");
     return 0;
 }
 
@@ -136,7 +145,8 @@ static int32_t print_response(const uint8_t *data, size_t size) {
             uint32_t len = be32toh(len_be);
 
             if (size < 1 + 4 + len) return RESP_INCOMPLETE; // msg bad resp
-            printf("(str) %.*s\n", len, &data[1 + sizeof(uint32_t)]);
+            
+            printf("\"%.*s\"\n", len, &data[1 + sizeof(uint32_t)]);
             return RESP_OK;
         }
         case TAG_INT: {

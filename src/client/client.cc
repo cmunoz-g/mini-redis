@@ -160,7 +160,7 @@ static int32_t print_response(const uint8_t *data, size_t size) {
             uint32_t len_be = 0;
             memcpy(&len_be, &data[1], sizeof(int32_t));
             uint32_t len = be32toh(len_be);
-            printf("(close) %.*s\n", len, &data[1 + sizeof(uint32_t)]);
+            printf("(close) %.*s", len, &data[1 + sizeof(uint32_t)]);
             return RESP_CLOSE;
         }
         default: {
@@ -185,7 +185,6 @@ static int32_t read_res(int fd) {
     uint32_t len = be32toh(len_be);
 
     if (len > MSG_SIZE_LIMIT) return -1; // print err msg : msg too long . should stop client ?
-
     //fprintf(stderr, "len : %d\n", len);
     //fprintf(stderr, "Checkpoint 1\n");
     err = handle_read(fd, &rbuf[4], len);
@@ -240,7 +239,6 @@ int run_client(uint16_t port) {
         if (cmd.empty()) continue;
         if (send_req(fd, cmd)) void(0); // errmgmt problem: could return non-zero if msg is larger than max size(non fatal) or if write fails in handle_write(fatal)
         if (read_res(fd) == RESP_CLOSE) {
-            printf("got here\n");
             ::close(fd);
             return 0;
         }; 

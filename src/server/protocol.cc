@@ -156,11 +156,11 @@ void out_end_arr(Buffer &out, size_t ctx, uint32_t n) {
 // }
 
 void out_close(Buffer &out, const char *s, size_t size) {
-    printf("called out_close() \n");
     uint8_t tag = TAG_CLOSE;
     buf_append(out, &tag, sizeof(tag));
 
     uint32_t len = static_cast<uint32_t>(size);
+    printf("len of msg  : %d\n", len);
     uint32_t be = htobe32(len);
     
     buf_append(out, reinterpret_cast<uint8_t *>(&be), sizeof(be));

@@ -234,10 +234,14 @@ void do_quit(Request &req) {
         if (c) {
             buf_reset(c->out);
             std::string bye_msg = "closing server\n";
+            size_t header_pos = 0;
+            
+            response_begin(c->out, &header_pos);
             out_close(c->out, bye_msg.data(), bye_msg.size());
-            ::write(c->fd, &c->out, buf_size(c->out)); // no need to do anything with result right ?
+            response_end(c->out, header_pos);
+
+            ::write(c->fd, c->out.data_begin, buf_size(c->out)); // no need to do anything with result right ? 
         }
     }
-
     data.close_server = true;
 }

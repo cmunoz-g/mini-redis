@@ -42,19 +42,18 @@ static HNode *h_detach(HTab *htab, HNode **from) {
     return node;
 }
 
-static bool h_foreach(HTab *htab, bool (*f)(HNode *, void *), void *arg) {
-    if (htab->mask == 0) return true;
+static void h_foreach(HTab *htab, void (*f)(HNode *, void *), void *arg) {
+    if (htab->mask == 0) return;
 
     const size_t buckets = htab->mask + 1;
     for (size_t i = 0; i < buckets; ++i) {
         HNode *node = htab->tab[i];
         while (node) {
             HNode *next = node->next;
-            if (!f(node, arg)) return false;
+            f(node, arg);
             node = next;
         }
     }
-    return true;
 }
 
 /* HMap rehashing functions */
@@ -93,7 +92,7 @@ bool hnode_same(HNode *node, HNode *key) {
     return node == key;
 }
 
-uint64_t hash(const uint8_t *data, size_t len) { // review
+uint64_t hash(const uint8_t *data, size_t len) { 
     uint32_t h = 0x811C9DC5;
     for (size_t i = 0; i < len; ++i) {
         h = (h + data[i]) * 0x01000193;
@@ -118,8 +117,6 @@ HNode *hm_delete(HMap *hmap, HNode *key, bool (*eq)(HNode *, HNode *)) {
     return nullptr;
 }
 
-#include <cstdio>
-
 void hm_insert(HMap *hmap, HNode *node) {
     if (!hmap->newer.tab) 
         h_init(&hmap->newer, INITIAL_TABLE_SIZE);
@@ -133,20 +130,9 @@ size_t hm_size(HMap *hmap) {
     return (hmap->newer.size + hmap->older.size);
 }
 
-// Foreach on the newer (the one that contains the item) is crashing when deleting all entries
-// Return this function to its previous state once fixed (or change signature to void idk)
-
-// Tested hm_foreach with a dummy ft and nothing broke, so error is most likely inside
-// delete_all_entries
-bool hm_foreach(HMap *hmap, bool (*f)(HNode *, void *), void *arg) {
-
-    // printf(" older size : %zu", hmap->older.size);
-    // printf(" newer size : %zu", hmap->newer.size);
-
-    //exit(0);
+void hm_foreach(HMap *hmap, void (*f)(HNode *, void *), void *arg) {
     h_foreach(&hmap->newer, f, arg);
     h_foreach(&hmap->older, f, arg);
-    return true;
 }
 
 void hm_destroy(HMap *hmap) {

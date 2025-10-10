@@ -10,6 +10,8 @@
 #include <unordered_map>
 #include <unistd.h>
 
+static ZSet k_empty_set{};
+
 void do_get(Request &req) {
     g_data &data = req.data;
     std::vector<std::string> &cmd = req.cmd;
@@ -65,18 +67,17 @@ void do_del(Request &req) {
     HNode *node = hm_lookup(&data.db, &key.node, &entry_eq);
 
     if (node) {
-        hm_delete(&data.db, node, &entry_eq); // Should this be in entry_del ? bc if its called from a timeout, the node won't be removed from the db
+        hm_delete(&data.db, node, &entry_eq); 
         entry_del(data, container_of(node, Entry, node));
     }
 
     return out_int(out, node ? 1 : 0);
 }
 
-static bool cb_keys(HNode *node, void *arg) { // can this fail ? should return false in any case ? if not, could hm/h_foreach be void ? check also the entry_del_all in server shutdown
+static void cb_keys(HNode *node, void *arg) { 
     Buffer &out = *(static_cast<Buffer *>(arg));
     const std::string &key = container_of(node, Entry, node)->key;
     out_str(out, key.data(), key.size(), 0);
-    return true;
 }
 
 void do_keys(Request &req) {
@@ -85,8 +86,6 @@ void do_keys(Request &req) {
     out_arr(out, static_cast<uint32_t>(hm_size(&data.db)));
     hm_foreach(&data.db, &cb_keys, (void *)&out);
 }
-
-static ZSet k_empty_set{}; // empty zset. should it be in a header ? if so, inline constexpr ?
 
 static ZSet *expect_zset(HMap &db, std::string s) {
     LookupKey key;

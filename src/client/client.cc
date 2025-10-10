@@ -26,8 +26,10 @@ enum {
 
 int get_socket(uint16_t port) {
     int fd = ::socket(AF_INET, SOCK_STREAM, 0);
-    if (fd < 0) return -1;
-
+    if (fd < 0) {
+        fprintf(stderr, "Error: Could not create socket\n");
+        return -1;
+    }
     struct sockaddr_in addr = {};
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
@@ -56,7 +58,14 @@ static int32_t handle_write(int fd, const char *buf, size_t n) {
     
     while (n > 0) {
         ssize_t rv = ::write(fd, buf, n);
-        if (rv <= 0) return -1;
+        if (rv <= 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+                printf("Error: write() failed, non-fatal\n");
+                return 0;
+            }
+            printf("Error: write() failed, closing connection\n");
+            return -1;
+        }
         n -= static_cast<size_t>(rv);
         buf += rv;
     }
@@ -73,7 +82,7 @@ static int32_t handle_read(int fd, char *buf, size_t n) {
     return 0;
 }
 
-static int32_t print_response(const uint8_t *data, size_t size);
+static uint32_t print_response(const uint8_t *data, size_t size);
 
 static int32_t print_arr(const uint8_t *data, size_t size) {
     (void)size;
@@ -82,6 +91,8 @@ static int32_t print_arr(const uint8_t *data, size_t size) {
 
     uint32_t words = be32toh(words_be);
     size_t arr_bytes = 1 + sizeof(uint32_t);
+
+    if (words == 0) printf("(empty array)\n");
 
     for (uint32_t i = 0; i < words; ++i) {
         printf("%d) ", i+1);
@@ -108,39 +119,36 @@ static int32_t print_arr(const uint8_t *data, size_t size) {
 enum {
     RESP_OK = 0,
     RESP_INCOMPLETE = 1,
-    RESP_CLOSE = 2
+    RESP_CLOSE = 2,
+    RESP_CORRUPT = 3,
+    RESP_COULD_NOT_READ =4
 };
 
-// Standardize either uint32_t or int32_t for sizes
-
-static int32_t print_response(const uint8_t *data, size_t size) {
-    if (size < 1) return -1; // print msg : bad response
+static uint32_t print_response(const uint8_t *data, size_t size) {
+    if (size < 1) return RESP_INCOMPLETE;
 
     switch (data[0]) {
         case TAG_NIL: printf("(nil)\n"); return RESP_OK;
         case TAG_ERR: {
-            if (size < 1 + 8) return RESP_INCOMPLETE; //msg bad resp
-            int32_t code_be = 0;
+            if (size < 1 + 8) return RESP_INCOMPLETE;
+            uint32_t code_be = 0;
             uint32_t len_be = 0;
-            memcpy(&code_be, &data[1], sizeof(int32_t));
-            memcpy(&len_be, &data[1 + sizeof(int32_t)], sizeof(uint32_t));
+            memcpy(&code_be, &data[1], sizeof(uint32_t));
+            memcpy(&len_be, &data[1 + sizeof(uint32_t)], sizeof(uint32_t));
             
-            int32_t code = be32toh(code_be);
-            int32_t len = be32toh(len_be);
+            uint32_t code = be32toh(code_be);
+            uint32_t len = be32toh(len_be);
 
-            if (static_cast<int>(size) < 1 + 8 + len) return RESP_INCOMPLETE; // bad resp
+            if (static_cast<uint32_t>(size) < 1 + 8 + len) return RESP_INCOMPLETE;
             printf("(err) %d : %.*s\n", code, len, &data[1 + 8]);
             return RESP_OK;
         }
         case TAG_STR: {
-            if (size < 1 + 4) return RESP_INCOMPLETE; // msg bad resp
+            if (size < 1 + 4) return RESP_INCOMPLETE;
             uint32_t len_be = 0;
-            memcpy(&len_be, &data[1], sizeof(int32_t));
-
+            memcpy(&len_be, &data[1], sizeof(uint32_t));
             uint32_t len = be32toh(len_be);
-
-            if (size < 1 + 4 + len) return RESP_INCOMPLETE; // msg bad resp
-            
+            if (size < 1 + 4 + len) return RESP_INCOMPLETE;
             printf("\"%.*s\"\n", len, &data[1 + sizeof(uint32_t)]);
             return RESP_OK;
         }
@@ -152,7 +160,7 @@ static int32_t print_response(const uint8_t *data, size_t size) {
             return RESP_OK;
         }
         case TAG_INT: {
-            if (size < 1 + 8) return RESP_INCOMPLETE; // msg bad resp
+            if (size < 1 + 8) return RESP_INCOMPLETE;
             int64_t val_be = 0;
             memcpy(&val_be, &data[1], sizeof(int64_t));
             int64_t val = be64toh(val_be);
@@ -160,57 +168,55 @@ static int32_t print_response(const uint8_t *data, size_t size) {
             return RESP_OK;
         }
         case TAG_DBL: {
-            if (size < 1 + 8) return RESP_INCOMPLETE; //msgbr
+            if (size < 1 + 8) return RESP_INCOMPLETE;
             double val = 0;
             memcpy(&val, &data[1], sizeof(double));
-            printf("(dbl) %g\n", val); // will this work since double wasnt covnerted ?
+            printf("(dbl) %g\n", val);
             return RESP_OK;
         }
         case TAG_ARR: {
-            if (size < 1 + 4) return RESP_INCOMPLETE; //msgbr
+            if (size < 1 + 4) return RESP_INCOMPLETE;
             return print_arr(data, size);
         }
-        case TAG_CLOSE: { // REDO FORMAT
+        case TAG_CLOSE: {
             uint32_t len_be = 0;
-            memcpy(&len_be, &data[1], sizeof(int32_t));
+            memcpy(&len_be, &data[1], sizeof(uint32_t));
             uint32_t len = be32toh(len_be);
-            printf("(close) %.*s", len, &data[1 + sizeof(uint32_t)]);
+            printf("Notification: %.*s", len, &data[1 + sizeof(uint32_t)]);
             return RESP_CLOSE;
         }
-
         default: {
-            //msg bad resposne
             return RESP_INCOMPLETE;
         }
     }
 }
 
-static int32_t read_res(int fd) {
+static uint32_t read_res(int fd) {
     char rbuf[4 + MSG_SIZE_LIMIT];
     errno = 0;
     int32_t err = handle_read(fd, rbuf, 4);
-    if (err) {
-        if (errno == 0) void(0); //EOF , print msg
-        else void(0); // read() error, print msg
-        return err;
+    if (err < 0) {
+        fprintf(stderr, "Error: read() failed, closing connection\n");
+        return RESP_COULD_NOT_READ;
     }
 
     uint32_t len_be = 0;
     memcpy(&len_be, rbuf, sizeof(uint32_t));
     uint32_t len = be32toh(len_be);
 
-    if (len > MSG_SIZE_LIMIT) return -1; // print err msg : msg too long . should stop client ?
-    //fprintf(stderr, "len : %d\n", len);
-    //fprintf(stderr, "Checkpoint 1\n");
+    if (len > MSG_SIZE_LIMIT) {
+        fprintf(stderr, "Error: Server response is too long\n");
+        return RESP_CORRUPT;
+    }
     err = handle_read(fd, &rbuf[4], len);
-    if (err) {
-        // read() error, msg
-        return err;
+    if (err < 0) {
+        fprintf(stderr, "Error: read() failed, closing connection\n");
+        return RESP_COULD_NOT_READ;
     }
 
     int rv = print_response(reinterpret_cast<uint8_t *>(&rbuf[4]), len);
     if (rv == RESP_INCOMPLETE) {
-        printf("resp incomplete\n"); // response incomplete, figure out format later.
+        printf("Error: Server response is incomplete\n");
     }
     return rv;
 }
@@ -219,23 +225,26 @@ static int32_t send_req(int fd, std::vector<std::string> &cmd) {
     uint32_t len = sizeof(uint32_t);
     for (std::string &s : cmd) len += sizeof(uint32_t) + s.size();
 
-    if (len > MSG_SIZE_LIMIT) return -1;
+    if (len > MSG_SIZE_LIMIT) {
+        printf("Error: Message size is bigger than limit (%d)\n", MSG_SIZE_LIMIT);
+        return 0;
+    }
 
     char wbuf[4 + MSG_SIZE_LIMIT];
-    memcpy(wbuf, &len, sizeof(uint32_t)); // [size of total payload]
+    memcpy(wbuf, &len, sizeof(uint32_t));
     uint32_t n = static_cast<uint32_t>(cmd.size()); 
-    memcpy(&wbuf[4], &n, sizeof(uint32_t)); // [n of cmds]
+    memcpy(&wbuf[4], &n, sizeof(uint32_t));
 
     size_t cur = 8;
     for (std::string &s : cmd) {
         uint32_t p = static_cast<uint32_t>(s.size());
-        memcpy(&wbuf[cur], &p, sizeof(uint32_t)); // [size of each cmd/arg]
+        memcpy(&wbuf[cur], &p, sizeof(uint32_t));
         cur += 4;
-        memcpy(&wbuf[cur], s.data(), s.size()); // [cmd/arg content]
+        memcpy(&wbuf[cur], s.data(), s.size());
         cur += s.size();
     }
 
-    return handle_write(fd, wbuf, len + 4); // len + 4 len represents [size of total payload] but doesnt include the 4 bytes of itself
+    return handle_write(fd, wbuf, len + 4); 
 }
 
 int run_client(uint16_t port) {
@@ -245,12 +254,19 @@ int run_client(uint16_t port) {
     for (;;) {
         printf("> ");
         std::string line;
-        if (!std::getline(std::cin, line)) void(0); // error . what to do ?
-
+        if (!std::getline(std::cin, line)) {
+            fprintf(stderr, "Error: getline() failed\n");
+            return -1;
+        }
         std::vector<std::string> cmd = split(line);
         if (cmd.empty()) continue;
-        if (send_req(fd, cmd)) void(0); // errmgmt problem: could return non-zero if msg is larger than max size(non fatal) or if write fails in handle_write(fatal)
-        if (read_res(fd) == RESP_CLOSE) {
+        if (send_req(fd, cmd)) {
+            ::close(fd);
+            return -1;
+        }
+        int rv = read_res(fd);
+        if (rv == RESP_CORRUPT) return -1;
+        if (rv == RESP_CLOSE) {
             ::close(fd);
             return 0;
         }; 

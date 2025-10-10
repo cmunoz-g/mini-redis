@@ -10,12 +10,15 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <unordered_map>
+#include <algorithm>
 
 static constexpr size_t BUFFER_SIZE_KB = 64;
 static constexpr size_t BYTES_IN_KB = 1024;
 
 static void do_request(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
     if (cmd.empty()) return out_err(out, ERR_EMPTY, "empty command");
+
+    std::transform(cmd[0].begin(), cmd[0].end(), cmd[0].begin(), [](unsigned char c){return std::tolower(c);});
 
     auto it = command_list.find(cmd[0]);
     if (it == command_list.end()) return out_err(out, ERR_UNKNOWN, "unknown command");
@@ -24,6 +27,7 @@ static void do_request(g_data &data, std::vector<std::string> &cmd, Buffer &out)
     if (cmd.size() != c.arity) return out_err(out, ERR_BAD_ARG, "wrong number of arguments");
     
     Request req{data, cmd, out};
+    printf("Notification: A command was performed: %s\n", cmd[0].data());
     return c.f(req);
 }
 
@@ -145,13 +149,10 @@ void handle_destroy(Conn *c, std::vector<Conn *> &fd2conn) {
     delete c;
 }
 
-static bool delete_all_entries(HNode *node, void *arg) {
+static void delete_all_entries(HNode *node, void *arg) {
     g_data *data = static_cast<g_data *>(arg);
     Entry *ent = container_of(node, Entry, node);
     entry_del(*data, ent);
-    //printf("hola");
-    //exit(0);
-    return true;
 }
 
 static int close_server(g_data &data, std::vector<Conn *> fd2conn) {

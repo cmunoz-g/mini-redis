@@ -20,7 +20,8 @@ enum {
     TAG_INT = 3,
     TAG_DBL = 4,
     TAG_ARR = 5,
-    TAG_CLOSE = 6
+    TAG_CLOSE = 6,
+    TAG_OK = 7
 };
 
 enum {
@@ -37,7 +38,7 @@ void response_end(Buffer &out, size_t header);
 
 /* Serialization */
 void out_nil(Buffer &out);
-void out_str(Buffer &out, const char *s, size_t size);
+void out_str(Buffer &out, const char *s, size_t size, int tag_ok);
 void out_int(Buffer &out, int64_t val);
 void out_arr(Buffer &out, uint32_t n);
 void out_err(Buffer &out, uint32_t code, const std::string &msg);

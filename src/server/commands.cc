@@ -25,7 +25,7 @@ void do_get(Request &req) {
     Entry *ent = container_of(node, Entry, node);
     if (ent->type != T_STR) return out_err(out, ERR_BAD_TYPE, "Not a string value");
 
-    return out_str(out, ent->str.data(), ent->str.size());
+    return out_str(out, ent->str.data(), ent->str.size(), 0);
 }
 
 void do_set(Request &req) {
@@ -51,7 +51,7 @@ void do_set(Request &req) {
         hm_insert(&data.db, &ent->node);
     }
     std::string ok_msg = "OK";
-    return out_str(out, ok_msg.data(), ok_msg.size());
+    return out_str(out, ok_msg.data(), ok_msg.size(), 1);
 }
 
 void do_del(Request &req) {
@@ -75,7 +75,7 @@ void do_del(Request &req) {
 static bool cb_keys(HNode *node, void *arg) { // can this fail ? should return false in any case ? if not, could hm/h_foreach be void ? check also the entry_del_all in server shutdown
     Buffer &out = *(static_cast<Buffer *>(arg));
     const std::string &key = container_of(node, Entry, node)->key;
-    out_str(out, key.data(), key.size());
+    out_str(out, key.data(), key.size(), 0);
     return true;
 }
 
@@ -139,7 +139,7 @@ void do_zquery(Request &req) {
     size_t ctx = out_begin_arr(out);
     int64_t n = 0;
     while (znode && n < limit) {
-        out_str(out, znode->name, znode->len);
+        out_str(out, znode->name, znode->len, 0);
         out_dbl(out, znode->score);
         znode = znode_offset(znode, +1);
         n += 2;

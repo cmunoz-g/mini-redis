@@ -68,8 +68,8 @@ void out_nil(Buffer &out) {
     buf_append(out, &tag, sizeof(tag));
 }
 
-void out_str(Buffer &out, const char *s, size_t size) {
-    uint8_t tag = TAG_STR;
+void out_str(Buffer &out, const char *s, size_t size, int tag_ok) {
+    uint8_t tag = tag_ok ? TAG_OK : TAG_STR;
     buf_append(out, &tag, sizeof(tag));
 
     uint32_t len = static_cast<uint32_t>(size);

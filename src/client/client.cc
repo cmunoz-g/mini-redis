@@ -20,7 +20,8 @@ enum {
     TAG_INT = 3,  
     TAG_DBL = 4,
     TAG_ARR = 5,
-    TAG_CLOSE = 6
+    TAG_CLOSE = 6,
+    TAG_OK = 7
 };
 
 int get_socket(uint16_t port) {
@@ -63,49 +64,43 @@ static int32_t handle_write(int fd, const char *buf, size_t n) {
 }
 
 static int32_t handle_read(int fd, char *buf, size_t n) {
-    // static int i = 0;
-    //size_t len = n;
-    // if (i) fprintf(stderr, "n : %zu\n", n);
     while (n > 0) {
         ssize_t rv = ::read(fd, buf, n);
-        //if (i) fprintf(stderr, "bytes read : %zu\n", rv);
         if (rv <= 0) return -1;
         n -= rv;
         buf += rv;
     }
-
-    // if (!i) {
-    //     fprintf(stderr, "bye\n");
-    //     exit(0);
-    // }
-    // i++;
     return 0;
 }
 
 static int32_t print_response(const uint8_t *data, size_t size);
 
-// Situation: Since I changed the return meaning on print_response, print_arr stopped worker
-// Also want to change the styling of the arrays
-// Either fix print_arr so it prints by itself or return to previous print_response() (dont think its the best idea)
-
 static int32_t print_arr(const uint8_t *data, size_t size) {
     (void)size;
-    uint32_t len_be = 0;
-    memcpy(&len_be, &data[1], sizeof(uint32_t));
+    uint32_t words_be = 0;
+    memcpy(&words_be, &data[1], sizeof(uint32_t));
 
-    uint32_t len = be32toh(len_be);
-
+    uint32_t words = be32toh(words_be);
     size_t arr_bytes = 1 + sizeof(uint32_t);
-    printf("len %d\n", len); // Len is 0 ??
 
-    for (uint32_t i = 0; i < len; ++i) {
+    for (uint32_t i = 0; i < words; ++i) {
         printf("%d) ", i+1);
-        uint32_t bytes = 0;
-        memcpy(&bytes, &data[arr_bytes + 1], sizeof(uint32_t));
-        printf("\"%.*s\"\n", bytes, &data[1 + arr_bytes]);
-        //print_response(&data[arr_bytes], size - arr_bytes);
-        //if (rv < 0) return rv;
-        arr_bytes += static_cast<size_t>(bytes);
+        uint8_t tag = data[arr_bytes];
+        arr_bytes++;
+        if (tag == TAG_STR) {
+            uint32_t bytes_be = 0;
+            memcpy(&bytes_be, &data[arr_bytes], sizeof(uint32_t));
+            uint32_t bytes = be32toh(bytes_be);
+            arr_bytes += sizeof(uint32_t);
+            printf("\"%.*s\"\n", bytes, &data[arr_bytes]);
+            arr_bytes += static_cast<size_t>(bytes);
+        }
+        else {
+            double val = 0;
+            memcpy(&val, &data[arr_bytes], sizeof(double));
+            printf("\"%g\"\n", val);
+            arr_bytes += sizeof(double);
+        }
     }
     return 0;
 }
@@ -149,6 +144,13 @@ static int32_t print_response(const uint8_t *data, size_t size) {
             printf("\"%.*s\"\n", len, &data[1 + sizeof(uint32_t)]);
             return RESP_OK;
         }
+        case TAG_OK: {
+            if (size < 1 + 4) return RESP_INCOMPLETE;
+            uint32_t len = 2;
+            if (size < 1 + 4 + len) return RESP_INCOMPLETE;
+            printf("%.*s\n", len, &data[1 + sizeof(uint32_t)]);
+            return RESP_OK;
+        }
         case TAG_INT: {
             if (size < 1 + 8) return RESP_INCOMPLETE; // msg bad resp
             int64_t val_be = 0;
@@ -175,6 +177,7 @@ static int32_t print_response(const uint8_t *data, size_t size) {
             printf("(close) %.*s", len, &data[1 + sizeof(uint32_t)]);
             return RESP_CLOSE;
         }
+
         default: {
             //msg bad resposne
             return RESP_INCOMPLETE;

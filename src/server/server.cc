@@ -145,7 +145,8 @@ void handle_destroy(Conn *c, std::vector<Conn *> &fd2conn) {
     dlist_detach(&c->idle_node);
     dlist_detach(&c->read_node);
     dlist_detach(&c->write_node);
-    // Check Conn creation, i'm doing new for both in,out Buffers. Dangling ?
+    delete c->in.buffer_begin;
+    delete c->out.buffer_begin;
     delete c;
 }
 

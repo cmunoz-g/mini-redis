@@ -1,10 +1,11 @@
 #include "sortedset.hh"
 #include "utils.hh"
-#include <cstdlib>
+#include <stdlib.h>
 #include <cstring>
 #include <string>
 #include <assert.h>
 
+/* Internal helpers */
 static bool hcmp(HNode *node, HNode *key) {
     ZNode *znode = container_of(node, ZNode, map);
     HKey *hkey = container_of(key, HKey, node);
@@ -14,7 +15,7 @@ static bool hcmp(HNode *node, HNode *key) {
 
 static ZNode *znode_new(const char *name, size_t len, double score) {
     size_t bytes = offsetof(struct ZNode, name) + len;
-    ZNode *node = static_cast<ZNode *>(std::malloc(bytes));
+    ZNode *node = static_cast<ZNode *>(malloc(bytes));
     if (!node) return nullptr;
 
     avl_init(&node->tree);
@@ -22,24 +23,12 @@ static ZNode *znode_new(const char *name, size_t len, double score) {
     node->map.hcode = hash(reinterpret_cast<const uint8_t *>(name), len);
     node->score = score;
     node->len = len;
-    std::memcpy(node->name, name, len);
+    memcpy(node->name, name, len);
     return node;
 }
 
 static void znode_del(ZNode *node) {
     free(node);
-}
-
-ZNode *zset_lookup(ZSet *zset, const char *name, size_t len) {
-    if (!zset->root) return nullptr;
-
-    HKey key;
-    key.node.hcode = hash(reinterpret_cast<const uint8_t *>(name), len);
-    key.name = name;
-    key.len = len;
-
-    HNode *found = hm_lookup(&zset->hmap, &key.node, &hcmp);
-    return found ? container_of(found, ZNode, map) : nullptr;
 }
 
 static bool zless(AVLNode *lhs, AVLNode *rhs) {
@@ -80,6 +69,26 @@ static void zset_update(ZSet *zset, ZNode *node, double score) {
     tree_insert(zset, node);
 }
 
+static void tree_destroy(AVLNode *node) {
+    if (node->l) tree_destroy(node->l);
+    if (node->r) tree_destroy(node->r);
+    znode_del(container_of(node, ZNode, tree));
+}
+
+/* API */
+
+ZNode *zset_lookup(ZSet *zset, const char *name, size_t len) {
+    if (!zset->root) return nullptr;
+
+    HKey key;
+    key.node.hcode = hash(reinterpret_cast<const uint8_t *>(name), len);
+    key.name = name;
+    key.len = len;
+
+    HNode *found = hm_lookup(&zset->hmap, &key.node, &hcmp);
+    return found ? container_of(found, ZNode, map) : nullptr;
+}
+
 bool zset_insert(ZSet *zset, const char *name, size_t len, double score) {
     if (ZNode *node = zset_lookup(zset, name, len)) {
         zset_update(zset, node, score);
@@ -104,8 +113,6 @@ void zset_delete(ZSet *zset, ZNode *node) {
     znode_del(node);
 }
 
-// ranged queries
-
 ZNode *zset_seekge(ZSet *zset, double score, const char *name, size_t len) {
     AVLNode *found = nullptr;
     AVLNode *node = zset->root;
@@ -122,12 +129,6 @@ ZNode *zset_seekge(ZSet *zset, double score, const char *name, size_t len) {
 ZNode *znode_offset(ZNode *node, int64_t offset) {
     AVLNode *tnode = node ? avl_offset(&node->tree, offset) : nullptr;
     return tnode ? container_of(tnode, ZNode, tree) : nullptr;
-}
-
-static void tree_destroy(AVLNode *node) {
-    if (node->l) tree_destroy(node->l);
-    if (node->r) tree_destroy(node->r);
-    znode_del(container_of(node, ZNode, tree));
 }
 
 void zset_destroy(ZSet *zset) {

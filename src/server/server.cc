@@ -12,19 +12,21 @@
 #include <unordered_map>
 #include <algorithm>
 
-static constexpr size_t BUFFER_SIZE_KB = 64;
-static constexpr size_t BYTES_IN_KB = 1024;
+static constexpr size_t buffer_size_kb = 64;
+static constexpr size_t bytes_in_kb = 1024;
+
+/* Request, read/write, Connection handling*/
 
 static void do_request(g_data &data, std::vector<std::string> &cmd, Buffer &out) {
-    if (cmd.empty()) return out_err(out, ERR_EMPTY, "empty command");
+    if (cmd.empty()) return out_err(out, err_empty, "empty command");
 
     std::transform(cmd[0].begin(), cmd[0].end(), cmd[0].begin(), [](unsigned char c){return std::tolower(c);});
 
     auto it = command_list.find(cmd[0]);
-    if (it == command_list.end()) return out_err(out, ERR_UNKNOWN, "unknown command");
+    if (it == command_list.end()) return out_err(out, err_unknown, "unknown command");
 
     const Command c = it->second;
-    if (cmd.size() != c.arity) return out_err(out, ERR_BAD_ARG, "wrong number of arguments");
+    if (cmd.size() != c.arity) return out_err(out, err_bad_arg, "wrong number of arguments");
     
     Request req{data, cmd, out};
     printf("Notification: A command was performed: %s\n", cmd[0].data());
@@ -38,7 +40,7 @@ static bool handle_request(g_data &data, Conn *conn) {
     uint32_t len = 0;
     memcpy(&len, conn->in.data_begin, 4);
 
-    if (len > MSG_SIZE_LIMIT) {
+    if (len > msg_size_limit) {
         conn->want_close = true;
         return false;
     }
@@ -65,7 +67,7 @@ static void handle_write(DList &write_list, Conn *conn) {
     size_t size = buf_size(conn->out);
 
     assert(size > 0);
-    ssize_t rv = ::write(conn->fd, conn->out.data_begin, size);
+    ssize_t rv = write(conn->fd, conn->out.data_begin, size);
 
     if (rv < 0) {
         if (errno == EAGAIN) return;
@@ -85,8 +87,8 @@ static void handle_write(DList &write_list, Conn *conn) {
 }
 
 static void handle_read(g_data &data, Conn *conn) { 
-    uint8_t buf[BUFFER_SIZE_KB * BYTES_IN_KB];
-    ssize_t rv = ::read(conn->fd, buf, sizeof(buf));
+    uint8_t buf[buffer_size_kb * bytes_in_kb];
+    ssize_t rv = read(conn->fd, buf, sizeof(buf));
     if (rv <= 0) {
         conn->want_close = true;
         return;
@@ -109,13 +111,13 @@ static void handle_read(g_data &data, Conn *conn) {
 static Conn *handle_accept(g_data &data, int fd) { 
     struct sockaddr_in client_addr = {};
     socklen_t addrlen = sizeof(client_addr);
-    int connfd = ::accept(fd, reinterpret_cast<sockaddr *>(&client_addr), &addrlen);
+    int connfd = accept(fd, reinterpret_cast<sockaddr *>(&client_addr), &addrlen);
     if (connfd < 0) {
-        err_msg("::accept() failed on client fd. Connection discarded\n", 0);
+        err_msg("accept() failed on client fd. Connection discarded\n", 0);
         return nullptr;
     }
     if (set_non_blocking(connfd)) {
-        err_msg("::fcntl() failed on client fd. Connection discarded\n", 0);
+        err_msg("fcntl() failed on client fd. Connection discarded\n", 0);
         return nullptr;
     }
     
@@ -127,7 +129,7 @@ static Conn *handle_accept(g_data &data, int fd) {
     dlist_insert_before(&data.read_list, &conn->read_node);
     dlist_insert_before(&data.write_list, &conn->write_node);
 
-    constexpr size_t buffer_size = BUFFER_SIZE_KB * BYTES_IN_KB;
+    constexpr size_t buffer_size = buffer_size_kb * bytes_in_kb;
     uint8_t *inbuf = new uint8_t[buffer_size];
     uint8_t *outbuf = new uint8_t[buffer_size];
 
@@ -138,9 +140,10 @@ static Conn *handle_accept(g_data &data, int fd) {
     return conn;
 }
 
+/* Cleanup */
 void handle_destroy(Conn *c, std::vector<Conn *> &fd2conn) {
     printf("Notification: Closing connection for client #%d\n", c->fd);
-    ::close(c->fd);
+    close(c->fd);
     fd2conn[c->fd] = nullptr;
     dlist_detach(&c->idle_node);
     dlist_detach(&c->read_node);
@@ -167,6 +170,8 @@ static int close_server(g_data &data, std::vector<Conn *> fd2conn) {
     return 0;
 }
 
+/* Server loop */
+
 int run_server(g_data &data, const char* host, uint16_t port) {
     int server_fd = socket_listen(host, port);
     if (server_fd < 0) return -1;
@@ -190,10 +195,10 @@ int run_server(g_data &data, const char* host, uint16_t port) {
         }
 
         int32_t timeout_ms = next_timer_ms(data);
-        int rv = ::poll(pfds.data(), (nfds_t)pfds.size(), timeout_ms);
+        int rv = poll(pfds.data(), (nfds_t)pfds.size(), timeout_ms);
         if (rv < 0) {
             if (errno == EINTR) continue;
-            else return err_msg("::poll() failed", 1);
+            else return err_msg("poll() failed", 1);
         }
 
         if (pfds[0].revents & POLLIN) {

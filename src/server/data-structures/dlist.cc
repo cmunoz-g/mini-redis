@@ -1,7 +1,6 @@
 #include "dlist.hh"
 
-#include <stdio.h>
-#include <stdlib.h>
+/* API */
 
 void dlist_detach(DList *node) {
     DList *prev = node->prev;

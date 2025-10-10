@@ -1,21 +1,11 @@
 #include "avltree.hh"
-#include <cstdint>
 #include <algorithm>
-#include <cassert>
+#include <assert.h>
 
-void avl_init(AVLNode *node) {
-    node->l = node->r = node->parent = nullptr;
-    node->height = 1;
-    node->count = 1;
-}
+/* Internal helpers */
 
-static uint32_t avl_height(AVLNode *node) {
-    return node ? node->height : 0;
-}
-
-static uint32_t avl_count(AVLNode *node) {
-    return node ? node->count : 0;
-}
+static uint32_t avl_height(AVLNode *node) { return node ? node->height : 0; }
+static uint32_t avl_count(AVLNode *node) { return node ? node->count : 0; }
 
 static void avl_update(AVLNode *node) {
     node->height = 1 + std::max(avl_height(node->l), avl_height(node->r));
@@ -70,6 +60,29 @@ static AVLNode *avl_fix_right(AVLNode *node) {
     return rot_left(node);
 } 
 
+static AVLNode *avl_del_one_empty_child(AVLNode *node) {
+    assert(!node->l || !node->r);
+
+    AVLNode *child = node->l ? node->l : node->r;
+    AVLNode *parent = node->parent;
+
+    if (child) child->parent = parent;
+    if (!parent) return child;
+
+    AVLNode **from = parent->l == node ? &parent->l : &parent->r;
+    *from = child;
+
+    return avl_fix(parent);
+}
+
+/* API */
+
+void avl_init(AVLNode *node) {
+    node->l = node->r = node->parent = nullptr;
+    node->height = 1;
+    node->count = 1;
+}
+
 AVLNode *avl_fix(AVLNode *node) {
     for (;;) {
         AVLNode **from = &node;
@@ -88,21 +101,6 @@ AVLNode *avl_fix(AVLNode *node) {
 
         node = parent;
     }
-}
-
-static AVLNode *avl_del_one_empty_child(AVLNode *node) {
-    assert(!node->l || !node->r);
-
-    AVLNode *child = node->l ? node->l : node->r;
-    AVLNode *parent = node->parent;
-
-    if (child) child->parent = parent;
-    if (!parent) return child;
-
-    AVLNode **from = parent->l == node ? &parent->l : &parent->r;
-    *from = child;
-
-    return avl_fix(parent);
 }
 
 AVLNode *avl_del(AVLNode *node) {
@@ -145,14 +143,4 @@ AVLNode *avl_offset(AVLNode *node, int64_t offset) {
         }
     }
     return node;
-}
-
-uint64_t avl_rank(AVLNode *node) {
-    uint64_t rank = avl_count(node->l);
-    while (node->parent) {
-        AVLNode *parent = node->parent;
-        if (parent->r == node) rank += avl_count(parent->l) + 1;
-        node = parent;
-    }
-    return rank;
 }

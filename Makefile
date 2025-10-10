@@ -15,7 +15,7 @@ SRC_SERVER = buffer.cc commands.cc entry.cc main.cc protocol.cc \
 	data-structures/avltree.cc data-structures/dlist.cc \
 	data-structures/hashtable.cc data-structures/heap.cc \
 	data-structures/sortedset.cc
-SRC_CLIENT = client.cc main.cc
+SRC_CLIENT = client_responses.cc client.cc main.cc
 OBJ_SERVER = $(SRC_SERVER:%.cc=$(OBJ_FOLDER_SERVER)/%.o)
 OBJ_CLIENT = $(SRC_CLIENT:%.cc=$(OBJ_FOLDER_CLIENT)/%.o)
 

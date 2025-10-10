@@ -6,6 +6,7 @@
 #include "heap.hh"
 #include "threadpool.hh"
 
+/* Structs */
 struct Conn { 
     int fd = -1;
     bool want_read = true, want_write = false, want_close = false;
@@ -23,5 +24,6 @@ struct g_data {
     std::vector<Conn *> *connections;
 };
 
+/* API */
 int run_server(g_data &data, const char* host, uint16_t port);
 void handle_destroy(Conn *c, std::vector<Conn *> &fd2conn);

@@ -1,16 +1,16 @@
 #pragma once
-#include <string>
 #include "server.hh"
 #include "sortedset.hh"
 #include "hashtable.hh"
+#include <string>
 
-enum {
-    T_INIT = 0,
-    T_STR = 1,
-    T_ZSET = 2,
+constexpr size_t heap_invalid = SIZE_MAX;
+
+enum entry_type {
+    t_init = 0,
+    t_str = 1,
+    t_zset = 2,
 };
-
-constexpr size_t HEAP_INVALID = SIZE_MAX; // caps ?
 
 struct Entry {
     struct HNode node;
@@ -18,7 +18,7 @@ struct Entry {
     uint32_t type = 0;
     std::string str;
     ZSet zset;
-    size_t heap_idx = HEAP_INVALID;
+    size_t heap_idx = heap_invalid;
 };
 
 struct LookupKey {
@@ -26,6 +26,7 @@ struct LookupKey {
     std::string key;
 };
 
+/* API */
 bool entry_eq(HNode *lhs, HNode *rhs);
 Entry *entry_new(uint32_t type);
 void entry_del(g_data &data, Entry *ent);

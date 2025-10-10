@@ -1,8 +1,9 @@
 #include "heap.hh"
 #include "entry.hh"
-#include <cstddef>
+#include <stddef.h>
 #include <algorithm>
-#include <vector>
+
+/* Internal helpers*/
 
 static size_t heap_left_index(size_t i) {
     return i * 2 + 1;
@@ -48,6 +49,8 @@ static void heap_down(HeapItem *a, size_t pos, size_t len) {
     a[pos] = t;
     *a[pos].ref = pos;
 }
+
+/* API */
 
 void heap_update(HeapItem *a, size_t pos, size_t len) {
     if (pos > 0 && a[heap_parent_index(pos)].val > a[pos].val)

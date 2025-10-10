@@ -1,19 +1,21 @@
 #include "hashtable.hh"
 #include <limits>
 #include <assert.h>
-#include <cstdlib>
+#include <stdlib.h>
 
-static constexpr size_t MAX_LOAD_FACTOR = 8;
-static constexpr size_t INITIAL_TABLE_SIZE = 4;
-static constexpr size_t REHASHING_WORK = 128;
+static constexpr size_t max_load_factor = 8;
+static constexpr size_t initial_table_size = 4;
+static constexpr size_t rehashing_work = 128;
 
-/* Tab functions */
+/* Internal helpers*/
+
+// Tab functions
 static void h_init(HTab *htab, size_t n) {
     assert(n > 0 && ((n - 1) & n) == 0);
-    htab->tab = reinterpret_cast<HNode **>(std::calloc(n, sizeof(HNode *)));
+    htab->tab = reinterpret_cast<HNode **>(calloc(n, sizeof(HNode *)));
     htab->mask = n - 1;
     htab->size = 0;
-    htab->threshold = (htab->mask + 1) * MAX_LOAD_FACTOR;
+    htab->threshold = (htab->mask + 1) * max_load_factor;
 }
 
 static void h_insert(HTab *htab, HNode *node) {
@@ -56,10 +58,10 @@ static void h_foreach(HTab *htab, void (*f)(HNode *, void *), void *arg) {
     }
 }
 
-/* HMap rehashing functions */
+// HMap rehashing functions
 static void hm_help_rehashing(HMap *hmap) {
     size_t nwork = 0;
-    while (nwork < REHASHING_WORK && hmap->older.size > 0 && hmap->migrate_pos <= hmap->older.mask) {
+    while (nwork < rehashing_work && hmap->older.size > 0 && hmap->migrate_pos <= hmap->older.mask) {
         HNode **from = &hmap->older.tab[hmap->migrate_pos];
         if (!*from) {
             hmap->migrate_pos++;
@@ -71,7 +73,7 @@ static void hm_help_rehashing(HMap *hmap) {
     }
 
     if (hmap->older.tab && hmap->older.size == 0) {
-        std::free(hmap->older.tab);
+        free(hmap->older.tab);
         hmap->older = HTab{};
     }
 }
@@ -119,7 +121,7 @@ HNode *hm_delete(HMap *hmap, HNode *key, bool (*eq)(HNode *, HNode *)) {
 
 void hm_insert(HMap *hmap, HNode *node) {
     if (!hmap->newer.tab) 
-        h_init(&hmap->newer, INITIAL_TABLE_SIZE);
+        h_init(&hmap->newer, initial_table_size);
     h_insert(&hmap->newer, node);
     if (!hmap->older.tab && hmap->newer.size >= hmap->newer.threshold)
         hm_trigger_rehashing(hmap);

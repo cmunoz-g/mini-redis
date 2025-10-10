@@ -12,15 +12,7 @@ struct Request {
     Buffer &out;
 };
 
-using Handler = void(*)(Request&);
-
-struct Command {
-    size_t arity;
-    Handler f;
-};
-
-// does order have to be like this ?
-
+/* API */
 void do_set(Request &req);
 void do_get(Request &req);
 void do_del(Request &req);
@@ -31,6 +23,15 @@ void do_zadd(Request &req);
 void do_zquery(Request &req);
 void do_expire(Request &req);
 void do_quit(Request &req);
+
+/* Function handlers */
+
+using Handler = void(*)(Request&);
+
+struct Command {
+    size_t arity;
+    Handler f;
+};
 
 const std::unordered_map<std::string, Command> command_list {
     {"get", {2, do_get}},
@@ -45,4 +46,3 @@ const std::unordered_map<std::string, Command> command_list {
     {"quit", {1, do_quit}},
     {"exit", {1, do_quit}}
 };
-

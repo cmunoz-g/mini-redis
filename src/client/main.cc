@@ -1,6 +1,6 @@
 // implement redis_client ! test with it !
 #include "client.hh"
-#include <cstdint>
+#include <stdint.h>
 #include <string>
 #include <stdexcept>
 

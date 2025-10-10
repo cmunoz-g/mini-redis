@@ -1,6 +1,6 @@
 #include "buffer.hh"
 #include <cstring>
-#include <cassert>
+#include <assert.h>
 
 /* Utils */
 
@@ -46,7 +46,7 @@ void buf_append(Buffer &buf, const uint8_t *data, size_t len) {
 
     if (free < len) buf_reset(buf);
 
-    std::memcpy(buf.data_end, data, len);
+    memcpy(buf.data_end, data, len);
     buf.data_end += len;
 }
 

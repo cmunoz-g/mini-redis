@@ -5,6 +5,7 @@ struct DList {
     DList *next = nullptr;
 };
 
+/* API */
 void dlist_init(DList *node);
 void dlist_insert_before(DList *target, DList *node);
 void dlist_detach(DList *node);

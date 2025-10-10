@@ -1,9 +1,9 @@
 #pragma once
-
 #include <vector>
 #include <deque>
 #include <pthread.h>
 
+/* Structs */
 struct Work {
     void(*f)(void *) = nullptr;
     void *arg = nullptr;
@@ -17,6 +17,7 @@ struct ThreadPool {
     bool stop;
 };
 
+/* API*/
 void thread_pool_queue(ThreadPool *tp, void(*f)(void *), void *arg);
 void thread_pool_init(ThreadPool *tp, size_t num_threads);
 void thread_pool_destroy(ThreadPool *tp);

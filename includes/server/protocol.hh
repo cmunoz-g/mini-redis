@@ -1,42 +1,38 @@
 #pragma once
 #include "buffer.hh"
-#include <cstdint>
+#include <stdint.h>
 #include <vector>
 #include <string>
 
-constexpr size_t MSG_SIZE_LIMIT = 4096; 
-constexpr size_t MAX_ARGS = 32u << 20;
+constexpr size_t msg_size_limit = 4096; 
+constexpr size_t max_args = 32u << 20;
 
-enum {
-    RES_OK = 0,
-    RES_ERR = 1,
-    RES_KEY_NOT_FOUND = 2
+enum tags {
+    tag_nil = 0,
+    tag_err = 1,
+    tag_str = 2,
+    tag_int = 3,
+    tag_dbl = 4,
+    tag_arr = 5,
+    tag_close = 6,
+    tag_ok = 7
 };
 
-enum {
-    TAG_NIL = 0,
-    TAG_ERR = 1,
-    TAG_STR = 2,
-    TAG_INT = 3,
-    TAG_DBL = 4,
-    TAG_ARR = 5,
-    TAG_CLOSE = 6,
-    TAG_OK = 7
+enum errs {
+    err_unknown = 1,
+    err_too_big = 2,
+    err_bad_type = 3,
+    err_bad_arg = 4,
+    err_empty = 5,
 };
 
-enum {
-    ERR_UNKNOWN = 1,
-    ERR_TOO_BIG = 2,
-    ERR_BAD_TYPE = 3,
-    ERR_BAD_ARG = 4,
-    ERR_EMPTY = 5,
-};
-
+/* API */
+// Request handling
 int32_t parse_request(const uint8_t *data, const size_t size, std::vector<std::string> &out);
+// Response handling
 void response_begin(Buffer &out, size_t *header);
 void response_end(Buffer &out, size_t header);
-
-/* Serialization */
+// Serialization
 void out_nil(Buffer &out);
 void out_str(Buffer &out, const char *s, size_t size, int tag_ok);
 void out_int(Buffer &out, int64_t val);

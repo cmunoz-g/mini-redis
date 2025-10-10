@@ -1,13 +1,7 @@
 #include "threadpool.hh"
-#include <cassert>
+#include <assert.h>
 
-void thread_pool_queue(ThreadPool *tp, void(*f)(void *), void *arg) {
-    pthread_mutex_lock(&tp->mu);
-    tp->queue.push_back(Work{f, arg});
-    pthread_cond_signal(&tp->not_empty);
-    pthread_mutex_unlock(&tp->mu);
-}
-
+/* Internal helper: thread routine */
 static void *worker(void *arg) {
     ThreadPool *tp = static_cast<ThreadPool *>(arg);
 
@@ -27,6 +21,14 @@ static void *worker(void *arg) {
         pthread_mutex_unlock(&tp->mu);
         w.f(w.arg);
     }
+}
+
+/* API */
+void thread_pool_queue(ThreadPool *tp, void(*f)(void *), void *arg) {
+    pthread_mutex_lock(&tp->mu);
+    tp->queue.push_back(Work{f, arg});
+    pthread_cond_signal(&tp->not_empty);
+    pthread_mutex_unlock(&tp->mu);
 }
 
 void thread_pool_init(ThreadPool *tp, size_t num_threads) {

@@ -1,5 +1,5 @@
 #pragma once
-#include <cstdint>
+#include <stdint.h>
 
 struct AVLNode {
     AVLNode *parent;
@@ -9,6 +9,7 @@ struct AVLNode {
     uint32_t count = 0;
 };
 
+/* API */
 void avl_init(AVLNode *node);
 AVLNode *avl_fix(AVLNode *node);
 AVLNode *avl_del(AVLNode *node);

@@ -1,5 +1,5 @@
 #pragma once
-#include <cstdint>
+#include <stdint.h>
 #include <vector>
 
 struct HeapItem {
@@ -7,6 +7,7 @@ struct HeapItem {
     size_t *ref;
 };
 
+/* API */
 void heap_update(HeapItem *a, size_t pos, size_t len);
 void heap_delete(std::vector<HeapItem> &a, size_t pos);
 void heap_upsert(std::vector<HeapItem> &a, size_t pos, HeapItem item);

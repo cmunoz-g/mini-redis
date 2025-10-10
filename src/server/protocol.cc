@@ -1,9 +1,10 @@
 #include "protocol.hh"
 #include <cstring>
 #include <limits>
-#include <cassert>
+#include <assert.h>
 
-/* Helpers */
+/* Internal helpers */
+
 static bool read_str(const uint8_t *&cur, const uint8_t *end, const size_t n, std::string &out) {
     if (cur + n > end) return false;
     out.assign(cur, cur + n);
@@ -18,13 +19,20 @@ static bool read_u32(const uint8_t *&cur, const uint8_t *end, uint32_t &out) {
     return true;
 }
 
-/* Request handling */
+static size_t response_size(Buffer &out, size_t header) {
+    size_t size = buf_size(out);
+    return size - header - sizeof(uint32_t); 
+}
+
+/* API */
+
+// Request parsing
 int32_t parse_request(const uint8_t *data, const size_t size, std::vector<std::string> &out) {
     const uint8_t *end = data + size;
     uint32_t nstr = 0;
 
     if (!read_u32(data, end, nstr)) return -1; 
-    if (nstr > MAX_ARGS) return -1;
+    if (nstr > max_args) return -1;
 
     while (out.size() < nstr) {
         uint32_t len = 0;
@@ -37,39 +45,34 @@ int32_t parse_request(const uint8_t *data, const size_t size, std::vector<std::s
     return 0;
 }
 
-/* Response header */
+// Response handlers
 void response_begin(Buffer &out, size_t *header) {
     *header = buf_size(out);
     uint32_t zero = 0;
     buf_append(out, reinterpret_cast<uint8_t *>(&zero), sizeof(uint32_t));
 }
 
-static size_t response_size(Buffer &out, size_t header) {
-    size_t size = buf_size(out);
-    return size - header - sizeof(uint32_t); 
-}
-
 void response_end(Buffer &out, size_t header) {
     size_t msg_size = response_size(out, header);
-    if (msg_size > MSG_SIZE_LIMIT) {
+    if (msg_size > msg_size_limit) {
         buf_truncate(out, header + sizeof(uint32_t));
-        out_err(out, ERR_TOO_BIG, "Response is too big");
+        out_err(out, err_too_big, "Response is too big");
         msg_size = response_size(out, header);
     }
 
     uint32_t len = static_cast<uint32_t>(msg_size);
     uint32_t be = htobe32(len);
-    std::memcpy(buf_at(out, header), &be, sizeof(uint32_t));
+    memcpy(buf_at(out, header), &be, sizeof(uint32_t));
 }
 
-/* Serialization */
+// Serialization
 void out_nil(Buffer &out) {
-    uint8_t tag = TAG_NIL;
+    uint8_t tag = tag_nil;
     buf_append(out, &tag, sizeof(tag));
 }
 
-void out_str(Buffer &out, const char *s, size_t size, int tag_ok) {
-    uint8_t tag = tag_ok ? TAG_OK : TAG_STR;
+void out_str(Buffer &out, const char *s, size_t size, int is_ok_tag) {
+    uint8_t tag = is_ok_tag ? tag_ok : tag_str;
     buf_append(out, &tag, sizeof(tag));
 
     uint32_t len = static_cast<uint32_t>(size);
@@ -80,7 +83,7 @@ void out_str(Buffer &out, const char *s, size_t size, int tag_ok) {
 }
 
 void out_int(Buffer &out, int64_t val) {
-    uint8_t tag = TAG_INT;
+    uint8_t tag = tag_int;
     buf_append(out, &tag, sizeof(tag));
 
     uint64_t u = static_cast<uint64_t>(val);
@@ -90,7 +93,7 @@ void out_int(Buffer &out, int64_t val) {
 }
 
 void out_arr(Buffer &out, uint32_t n) {
-    uint8_t tag = TAG_ARR;
+    uint8_t tag = tag_arr;
     buf_append(out, &tag, sizeof(tag));
 
     uint32_t be = htobe32(n);
@@ -99,7 +102,7 @@ void out_arr(Buffer &out, uint32_t n) {
 }
 
 void out_err(Buffer &out, uint32_t code, const std::string &msg) {
-    uint8_t tag = TAG_ERR;
+    uint8_t tag = tag_err;
     buf_append(out, &tag, sizeof(tag));
 
     uint32_t code_be = htobe32(code);
@@ -113,13 +116,13 @@ void out_err(Buffer &out, uint32_t code, const std::string &msg) {
 }
 
 void out_dbl(Buffer &out, double val) {
-    uint8_t tag = TAG_DBL;
+    uint8_t tag = tag_dbl;
     buf_append(out, &tag, sizeof(tag));
     buf_append(out, reinterpret_cast<uint8_t *>(&val), sizeof(val));
 }
 
 size_t out_begin_arr(Buffer &out) {
-    uint8_t tag = TAG_ARR;
+    uint8_t tag = tag_arr;
     buf_append(out, &tag, sizeof(tag));
 
     uint32_t zero = 0;
@@ -129,14 +132,14 @@ size_t out_begin_arr(Buffer &out) {
 
 void out_end_arr(Buffer &out, size_t ctx, uint32_t n) {
     uint8_t tag = *buf_at(out, ctx - 1);
-    assert(tag == TAG_ARR);
+    assert(tag == tag_arr);
 
     uint32_t be = htobe32(n);
     memcpy(buf_at(out, ctx), &be, sizeof(be));
 }
 
 void out_close(Buffer &out, const char *s, size_t size) {
-    uint8_t tag = TAG_CLOSE;
+    uint8_t tag = tag_close;
     buf_append(out, &tag, sizeof(tag));
 
     uint32_t len = static_cast<uint32_t>(size);
